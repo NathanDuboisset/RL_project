@@ -1,2 +1,2 @@
-from .agent import DQNAgent
-from .model import BlockBlastCNNNet
+from .agent import *
+from .models import BlockBlastCNNNet

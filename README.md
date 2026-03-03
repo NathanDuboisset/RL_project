@@ -18,10 +18,10 @@ block-blast-rl/
 │       ├── agent.py              # DQN Logic (Replay Buffer, Target Network)
 │       └── model.py              # CNN Architecture
 ├── notebooks/                  
-│   ├── training.ipynb            # Agent training loops
-│   └── evaluation.ipynb          # Performance testing and video rendering
+│   ├── notebook.ipynb            
+│   │   ...
+│   └── notebook.ipynb         
 ├── checkpoints/                
-├── videos/                     
 ├── .venv/                      
 ├── pyproject.toml              
 └── .gitignore

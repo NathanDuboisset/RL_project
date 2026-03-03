@@ -13,3 +13,4 @@ wheels/
 # training data
 checkpoints/
 videos/
+plots/

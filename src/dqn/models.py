@@ -31,6 +31,9 @@ class BlockBlastCNNNet(nn.Module):
         )
 
     def forward(self, board, pieces, pieces_used, combo):
+        """
+        We need to give the parameters extracted for the dictionary observation space
+        """
         x_board = board.unsqueeze(1).float() 
         x_pieces = pieces.float()
         board_features = self.board_conv(x_board)
@@ -39,6 +42,7 @@ class BlockBlastCNNNet(nn.Module):
         x_combo = combo.float().view(-1, 1)
         x_used = pieces_used.float()
 
+        # We combine everything
         combined = torch.cat([board_features, pieces_features, x_used, x_combo], dim=1)
         
         return self.fc(combined)
