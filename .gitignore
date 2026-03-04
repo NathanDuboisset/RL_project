@@ -5,6 +5,12 @@ build/
 dist/
 wheels/
 *.egg-info
+*$py.class
 
-# Virtual environments
+# 
 .venv
+
+# training data
+checkpoints/
+videos/
+plots/
