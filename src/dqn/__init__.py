@@ -1,2 +1,2 @@
 from .agent import *
-from .models import BlockBlastCNNNet
+from .models import *
