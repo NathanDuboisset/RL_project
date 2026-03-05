@@ -6,7 +6,7 @@ import torch.optim as optim
 import numpy as np
 import random
 from collections import deque
-from .models import BlockBlastCNNNet
+from .models import BlockBlastCNNNet1P
 
 class BaseAgent(ABC):
     def __init__(self, model, optimizer, device):
@@ -30,15 +30,15 @@ class BaseAgent(ABC):
     def load_model(self, path):
         pass
 
-class DDQNAgent(BaseAgent):
+class DDQNAgent1P(BaseAgent):
     def __init__(self, action_size=192, lr=1e-4, gamma=0.99, buffer_size=10000, batch_size=64):
         self.action_size = action_size
         self.gamma = gamma
         self.batch_size = batch_size
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.policy_net = BlockBlastCNNNet(output_size=action_size).to(self.device)
-        self.target_net = BlockBlastCNNNet(output_size=action_size).to(self.device)
+        self.policy_net = BlockBlastCNNNet1P(output_size=action_size).to(self.device)
+        self.target_net = BlockBlastCNNNet1P(output_size=action_size).to(self.device)
         self.update_target_model() # identical weights at the start
         
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
