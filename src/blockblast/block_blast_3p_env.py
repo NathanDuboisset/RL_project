@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import gymnasium as gym
 from gymnasium import spaces
 import matplotlib.pyplot as plt
@@ -39,6 +40,7 @@ class BlockBlast3PEnv(gym.Env):
             "pieces":      spaces.Box(low=0, high=1, shape=(self.n_pieces, self.piece_box_size, self.piece_box_size), dtype=np.int8),
             "pieces_used": spaces.MultiBinary(self.n_pieces),
             "combo":       spaces.Box(low=0, high=np.inf, shape=(1,), dtype=np.int32),
+            "valid_placements": spaces.Box(low=0, high=1, shape=(self.n_pieces, self.grid_size, self.grid_size), dtype=np.int8),
         })
 
         self.shapes_keys = list(SHAPES.keys())
@@ -57,6 +59,7 @@ class BlockBlast3PEnv(gym.Env):
         self.pieces_used = None
         self.combo = 0
         self.round_had_clear = False
+        self.valid_placements = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -65,6 +68,7 @@ class BlockBlast3PEnv(gym.Env):
         self.round_had_clear = False
         self.pieces_used = np.zeros(self.n_pieces, dtype=np.int8)
         self._sample_new_pieces()
+        self._update_all_valid_placements()
 
         if self.render_mode == "human":
             self.render()
@@ -77,7 +81,7 @@ class BlockBlast3PEnv(gym.Env):
         row = pos // self.grid_size
         col = pos % self.grid_size
 
-        if self.pieces_used[piece_idx] or not self._can_place(self.pieces_grids[piece_idx], row, col):
+        if not self.valid_placements[piece_idx, row, col]:
             return self._get_obs(), -1.0, True, False, self._get_info()
 
         self._place_piece(self.pieces_grids[piece_idx], row, col)
@@ -96,15 +100,11 @@ class BlockBlast3PEnv(gym.Env):
             self.round_had_clear = False
             self.pieces_used = np.zeros(self.n_pieces, dtype=np.int8)
             self._sample_new_pieces()
-            terminated = any(
-                not self._has_valid_moves(self.pieces_grids[i])
-                for i in range(self.n_pieces)
-            )
+            self._update_all_valid_placements()
+            terminated = not np.any(self.valid_placements)
         else:
-            terminated = not any(
-                not self.pieces_used[i] and self._has_valid_moves(self.pieces_grids[i])
-                for i in range(self.n_pieces)
-            )
+            self._update_all_valid_placements()
+            terminated = not np.any(self.valid_placements)
 
         if self.render_mode == "human":
             self.render()
@@ -117,6 +117,7 @@ class BlockBlast3PEnv(gym.Env):
             "pieces":      self.pieces_padded.copy(),
             "pieces_used": self.pieces_used.copy(),
             "combo":       np.array([self.combo], dtype=np.int32),
+            "valid_placements": self.valid_placements.copy(),
         }
 
     def _get_info(self):
@@ -135,14 +136,18 @@ class BlockBlast3PEnv(gym.Env):
             h, w = grid.shape
             self.pieces_padded[i, :h, :w] = grid
 
-    def _can_place(self, shape_grid, row, col):
-        h, w = shape_grid.shape
-        if row + h > self.grid_size or col + w > self.grid_size:
-            return False
-        board_crop = self.board[row:row+h, col:col+w]
-        if np.any((board_crop + shape_grid) > 1):
-            return False
-        return True
+    def _update_all_valid_placements(self):
+        self.valid_placements = np.zeros((self.n_pieces, self.grid_size, self.grid_size), dtype=np.int8)
+        for i in range(self.n_pieces):
+            if self.pieces_used[i]:
+                continue
+            
+            shape_grid = self.pieces_grids[i]
+            h, w = shape_grid.shape
+            
+            windowed_board = sliding_window_view(self.board, window_shape=shape_grid.shape)
+            overlaps = (windowed_board & shape_grid).any(axis=(-2, -1))
+            self.valid_placements[i, :self.grid_size - h + 1, :self.grid_size - w + 1] = (~overlaps).astype(np.int8)
 
     def _place_piece(self, shape_grid, row, col):
         h, w = shape_grid.shape
@@ -156,12 +161,7 @@ class BlockBlast3PEnv(gym.Env):
         self.board[:, full_cols] = 0
         return num_cleared
 
-    def _has_valid_moves(self, shape_grid):
-        for r in range(self.grid_size):
-            for c in range(self.grid_size):
-                if self._can_place(shape_grid, r, c):
-                    return True
-        return False
+
 
     def render(self):
         if self.render_mode == "ansi":
