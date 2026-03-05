@@ -65,11 +65,11 @@ class DDQNAgent(BaseAgent):
             return random.choice(valid_actions)
         
         with torch.no_grad():
-            board = torch.FloatTensor(state['board']).unsqueeze(0).to(self.device)
-            pieces = torch.FloatTensor(state['pieces']).unsqueeze(0).to(self.device)
-            used = torch.FloatTensor(state['pieces_used']).unsqueeze(0).to(self.device)
-            combo = torch.FloatTensor(state['combo']).unsqueeze(0).to(self.device)
-            valid = torch.FloatTensor(state['valid_placements']).unsqueeze(0).to(self.device)
+            board = torch.as_tensor(state['board'], dtype=torch.float32, device=self.device).unsqueeze(0)
+            pieces = torch.as_tensor(state['pieces'], dtype=torch.float32, device=self.device).unsqueeze(0)
+            used = torch.as_tensor(state['pieces_used'], dtype=torch.float32, device=self.device).unsqueeze(0)
+            combo = torch.as_tensor(state['combo'], dtype=torch.float32, device=self.device).unsqueeze(0)
+            valid = torch.as_tensor(state['valid_placements'], dtype=torch.float32, device=self.device).unsqueeze(0)
             
             q_values = self.policy_net(board, pieces, used, combo, valid).squeeze(0)
             
@@ -87,13 +87,14 @@ class DDQNAgent(BaseAgent):
         batch = random.sample(self.memory, self.batch_size)
         
         # preparing batches for each component of the state
-        states = {key: torch.stack([torch.FloatTensor(s[0][key]) for s in batch]).to(self.device) 
+        # using np.array before converting to tensor is significantly faster than stacking individual tensors
+        states = {key: torch.as_tensor(np.array([s[0][key] for s in batch]), dtype=torch.float32, device=self.device) 
                   for key in ['board', 'pieces', 'pieces_used', 'combo', 'valid_placements']}
-        actions = torch.LongTensor([s[1] for s in batch]).to(self.device).view(-1, 1)
-        rewards = torch.FloatTensor([s[2] for s in batch]).to(self.device).view(-1, 1)
-        next_states = {key: torch.stack([torch.FloatTensor(s[3][key]) for s in batch]).to(self.device) 
+        actions = torch.as_tensor(np.array([s[1] for s in batch]), dtype=torch.long, device=self.device).view(-1, 1)
+        rewards = torch.as_tensor(np.array([s[2] for s in batch]), dtype=torch.float32, device=self.device).view(-1, 1)
+        next_states = {key: torch.as_tensor(np.array([s[3][key] for s in batch]), dtype=torch.float32, device=self.device) 
                        for key in ['board', 'pieces', 'pieces_used', 'combo', 'valid_placements']}
-        dones = torch.FloatTensor([s[4] for s in batch]).to(self.device).view(-1, 1)
+        dones = torch.as_tensor(np.array([s[4] for s in batch]), dtype=torch.float32, device=self.device).view(-1, 1)
 
         # computing current Q values and target Q values
         current_q = self.policy_net(states['board'], states['pieces'], 
