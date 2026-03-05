@@ -53,17 +53,30 @@ class DDQNAgent1P(BaseAgent):
         self.memory.append((state, action, reward, next_state, done))
 
     def select_action(self, state, epsilon):
-        """Epsilon-Greedy Action Selection"""
-        if random.random() < epsilon:
+        """Epsilon-Greedy Action Selection with valid move masking"""
+        valid_mask = state['valid_placements'].flatten()
+        valid_actions = np.flatnonzero(valid_mask)
+        
+        if len(valid_actions) == 0:
+            # Fallback if no valid actions exist (should be handled by done flag first generally)
             return random.randint(0, self.action_size - 1)
+
+        if random.random() < epsilon:
+            return random.choice(valid_actions)
         
         with torch.no_grad():
             board = torch.FloatTensor(state['board']).unsqueeze(0).to(self.device)
             pieces = torch.FloatTensor(state['pieces']).unsqueeze(0).to(self.device)
             used = torch.FloatTensor(state['pieces_used']).unsqueeze(0).to(self.device)
             combo = torch.FloatTensor(state['combo']).unsqueeze(0).to(self.device)
+            valid = torch.FloatTensor(state['valid_placements']).unsqueeze(0).to(self.device)
             
-            q_values = self.policy_net(board, pieces, used, combo)
+            q_values = self.policy_net(board, pieces, used, combo, valid).squeeze(0)
+            
+            # Mask invalid actions
+            valid_tensor_mask = torch.BoolTensor(valid_mask).to(self.device)
+            q_values[~valid_tensor_mask] = -1e9
+            
             return torch.argmax(q_values).item()
 
     def update_model(self):
@@ -75,20 +88,28 @@ class DDQNAgent1P(BaseAgent):
         
         # preparing batches for each component of the state
         states = {key: torch.stack([torch.FloatTensor(s[0][key]) for s in batch]).to(self.device) 
-                  for key in ['board', 'pieces', 'pieces_used', 'combo']}
+                  for key in ['board', 'pieces', 'pieces_used', 'combo', 'valid_placements']}
         actions = torch.LongTensor([s[1] for s in batch]).to(self.device).view(-1, 1)
         rewards = torch.FloatTensor([s[2] for s in batch]).to(self.device).view(-1, 1)
         next_states = {key: torch.stack([torch.FloatTensor(s[3][key]) for s in batch]).to(self.device) 
-                       for key in ['board', 'pieces', 'pieces_used', 'combo']}
+                       for key in ['board', 'pieces', 'pieces_used', 'combo', 'valid_placements']}
         dones = torch.FloatTensor([s[4] for s in batch]).to(self.device).view(-1, 1)
 
         # computing current Q values and target Q values
         current_q = self.policy_net(states['board'], states['pieces'], 
-                                    states['pieces_used'], states['combo']).gather(1, actions)
+                                    states['pieces_used'], states['combo'], 
+                                    states['valid_placements']).gather(1, actions)
         
         with torch.no_grad():
-            next_q = self.target_net(next_states['board'], next_states['pieces'], 
-                                     next_states['pieces_used'], next_states['combo']).max(1)[0].view(-1, 1)
+            next_q_all = self.target_net(next_states['board'], next_states['pieces'], 
+                                         next_states['pieces_used'], next_states['combo'],
+                                         next_states['valid_placements'])
+            
+            # mask invalid actions in next state
+            next_valid_mask = next_states['valid_placements'].view(self.batch_size, -1).bool()
+            next_q_all[~next_valid_mask] = -1e9
+            
+            next_q = next_q_all.max(1)[0].view(-1, 1)
             target_q = rewards + (self.gamma * next_q * (1 - dones))
 
         # loss and optimization step

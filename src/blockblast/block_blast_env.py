@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import gymnasium as gym
 from gymnasium import spaces
 import matplotlib.pyplot as plt
@@ -15,7 +16,7 @@ SHAPES = {
 }
 
 class BlockBlastEnv(gym.Env):
-    metadata = {"render_modes": ["human", "ansi", "rgb_array"]}
+    metadata = {"render_modes": ["human", "ansi", "rgb_array","no_render"]}
 
     def __init__(
             self, 
@@ -35,6 +36,7 @@ class BlockBlastEnv(gym.Env):
             {
                 "board": spaces.Box(low=0, high=1, shape=(self.grid_size, self.grid_size), dtype=np.int8),
                 "piece": spaces.Box(low=0, high=1, shape=(self.piece_box_size, self.piece_box_size), dtype=np.int8),
+                "valid_placements": spaces.Box(low=0, high=1, shape=(self.grid_size, self.grid_size), dtype=np.int8),
             }
         )
 
@@ -52,11 +54,13 @@ class BlockBlastEnv(gym.Env):
         self.board = None
         self.current_piece = None
         self.current_shape_grid = None
+        self.valid_placements = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.board = np.zeros((self.grid_size, self.grid_size), dtype=np.int8)
         self._sample_new_piece()
+        self.valid_placements = self._get_valid_placements(self.current_shape_grid)
 
         if self.render_mode == "human":
             self.render()
@@ -67,7 +71,7 @@ class BlockBlastEnv(gym.Env):
         row = action // self.grid_size
         col = action % self.grid_size
 
-        if not self._can_place(self.current_shape_grid, row, col):
+        if not self.valid_placements[row, col]:
             return self._get_obs(), -1.0, True, False, self._get_info()
 
         self._place_piece(self.current_shape_grid, row, col)
@@ -79,7 +83,8 @@ class BlockBlastEnv(gym.Env):
             reward = self.base_points * (lines_cleared ** 2)
 
         self._sample_new_piece()
-        terminated = not self._has_valid_moves(self.current_shape_grid)
+        self.valid_placements = self._get_valid_placements(self.current_shape_grid)
+        terminated = not np.any(self.valid_placements)
 
         if self.render_mode == "human":
             self.render()
@@ -89,7 +94,8 @@ class BlockBlastEnv(gym.Env):
     def _get_obs(self):
         return {
             "board": self.board.copy(),
-            "piece": self.current_piece.copy()
+            "piece": self.current_piece.copy(),
+            "valid_placements": self.valid_placements.copy()
         }
 
     def _get_info(self):
@@ -106,14 +112,15 @@ class BlockBlastEnv(gym.Env):
         padded_piece[:h, :w] = self.current_shape_grid
         self.current_piece = padded_piece
 
-    def _can_place(self, shape_grid, row, col):
+    def _get_valid_placements(self, shape_grid):
         h, w = shape_grid.shape
-        if row + h > self.grid_size or col + w > self.grid_size:
-            return False
-        board_crop = self.board[row:row+h, col:col+w]
-        if np.any((board_crop + shape_grid) > 1):
-            return False
-        return True
+        valid_mask = np.zeros((self.grid_size, self.grid_size), dtype=np.int8)
+        
+        windowed_board = sliding_window_view(self.board, window_shape=shape_grid.shape)
+        overlaps = (windowed_board & shape_grid).any(axis=(-2, -1))
+        
+        valid_mask[:self.grid_size - h + 1, :self.grid_size - w + 1] = (~overlaps).astype(np.int8)
+        return valid_mask
 
     def _place_piece(self, shape_grid, row, col):
         h, w = shape_grid.shape
@@ -127,12 +134,7 @@ class BlockBlastEnv(gym.Env):
         self.board[:, full_cols] = 0
         return num_cleared
 
-    def _has_valid_moves(self, shape_grid):
-        for r in range(self.grid_size):
-            for c in range(self.grid_size):
-                if self._can_place(shape_grid, r, c):
-                    return True
-        return False
+
 
     def render(self):
         if self.render_mode == "ansi":
@@ -141,6 +143,8 @@ class BlockBlastEnv(gym.Env):
             return self._render_rgb_array()
         elif self.render_mode == "human":
             self._render_human()
+        else:
+            pass
 
     def _render_ansi(self):
         output = "Board:\n"
