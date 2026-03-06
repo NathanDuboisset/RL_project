@@ -37,6 +37,12 @@ class BlockBlastEnv(gym.Env):
                 "board": spaces.Box(low=0, high=1, shape=(self.grid_size, self.grid_size), dtype=np.int8),
                 "piece": spaces.Box(low=0, high=1, shape=(self.piece_box_size, self.piece_box_size), dtype=np.int8),
                 "valid_placements": spaces.Box(low=0, high=1, shape=(self.grid_size, self.grid_size), dtype=np.int8),
+                "placements_result": spaces.Box(
+                    low=0,
+                    high=1,
+                    shape=(self.grid_size, self.grid_size, self.grid_size, self.grid_size),
+                    dtype=np.int8,
+                ),
             }
         )
 
@@ -55,12 +61,14 @@ class BlockBlastEnv(gym.Env):
         self.current_piece = None
         self.current_shape_grid = None
         self.valid_placements = None
+        self.placements_result = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.board = np.zeros((self.grid_size, self.grid_size), dtype=np.int8)
         self._sample_new_piece()
         self.valid_placements = self._get_valid_placements(self.current_shape_grid)
+        self.placements_result = self._get_placements_result(self.current_shape_grid)
 
         if self.render_mode == "human":
             self.render()
@@ -84,6 +92,7 @@ class BlockBlastEnv(gym.Env):
 
         self._sample_new_piece()
         self.valid_placements = self._get_valid_placements(self.current_shape_grid)
+        self.placements_result = self._get_placements_result(self.current_shape_grid)
         terminated = not np.any(self.valid_placements)
 
         if self.render_mode == "human":
@@ -95,7 +104,8 @@ class BlockBlastEnv(gym.Env):
         return {
             "board": self.board.copy(),
             "piece": self.current_piece.copy(),
-            "valid_placements": self.valid_placements.copy()
+            "valid_placements": self.valid_placements.copy(),
+            "placements_result": self.placements_result.copy(),
         }
 
     def _get_info(self):
@@ -121,6 +131,42 @@ class BlockBlastEnv(gym.Env):
         
         valid_mask[:self.grid_size - h + 1, :self.grid_size - w + 1] = (~overlaps).astype(np.int8)
         return valid_mask
+
+    def _get_placements_result(self, shape_grid):
+        """
+        For each possible (row, col) placement, return the resulting board
+        after placing the current piece and clearing lines. If the placement
+        is invalid, the result is an all-blocked grid.
+        """
+        # default: all blocked grids for invalid placements
+        results = np.ones(
+            (self.grid_size, self.grid_size, self.grid_size, self.grid_size),
+            dtype=np.int8,
+        )
+
+        h, w = shape_grid.shape
+
+        # only positions where the top-left of the shape can fit on the board
+        max_row = self.grid_size - h + 1
+        max_col = self.grid_size - w + 1
+
+        for row in range(max_row):
+            for col in range(max_col):
+                if not self.valid_placements[row, col]:
+                    continue
+
+                board_copy = self.board.copy()
+                board_copy[row : row + h, col : col + w] += shape_grid
+
+                # apply the same clearing logic as in the real env step
+                full_rows = np.all(board_copy == 1, axis=1)
+                full_cols = np.all(board_copy == 1, axis=0)
+                board_copy[full_rows, :] = 0
+                board_copy[:, full_cols] = 0
+
+                results[row, col] = board_copy
+
+        return results
 
     def _place_piece(self, shape_grid, row, col):
         h, w = shape_grid.shape
