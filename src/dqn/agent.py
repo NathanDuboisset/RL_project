@@ -15,7 +15,7 @@ class BaseAgent(ABC):
         self.device = device
 
     @abstractmethod
-    def select_action(self, state, epsilon):
+    def select_action(self, state, epsilon) -> int:
         pass
 
     @abstractmethod
