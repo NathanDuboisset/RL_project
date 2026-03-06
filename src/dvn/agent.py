@@ -137,10 +137,8 @@ class DVNAgent1P(BaseAgent):
                 q_vals = next_reward + self.gamma * v_vals
                 target_v[idx] = torch.max(q_vals) # max_a' [ R_t+2 + gamma * V(S_after_t+1) ]
                 
-        # Assemblage final de la cible TD
-        target_q = rewards + (self.gamma * target_v)
-        
-        loss = self.loss_fn(current_v, target_q)
+            
+        loss = self.loss_fn(current_v, target_v) 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
