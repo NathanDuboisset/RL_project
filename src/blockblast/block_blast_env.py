@@ -105,7 +105,7 @@ class BlockBlastEnv(gym.Env):
             "board": self.board.copy(),
             "piece": self.current_piece.copy(),
             "valid_placements": self.valid_placements.copy(),
-            "placements_result": self.placements_result.copy(),
+            "placements_result": (self.placements_result[0].copy(), self.placements_result[1].copy()),
         }
 
     def _get_info(self):

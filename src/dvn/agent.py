@@ -64,7 +64,7 @@ class DVNAgent1P(BaseAgent):
         
         for a in valid_actions:
             r, c = self._from_action_to_coordinates(a)
-            hyp_next_board, hyp_reward = state['placements_result'][r, c]
+            hyp_next_board, hyp_reward = state['placements_result'][0][r, c], state['placements_result'][1][r, c]
             rewards.append(hyp_reward)
             afterstates.append(hyp_next_board)
 
@@ -92,9 +92,9 @@ class DVNAgent1P(BaseAgent):
         current_afterstates = []
         for s in batch:
             state, action = s[0], s[1]
-            r, c = action // self.grid_size, action % self.grid_size
+            r, c = self._from_action_to_coordinates(action)
             # On récupère la grille exacte après le placement joué
-            current_afterstates.append(state['placements_result'][r, c])
+            current_afterstates.append(state['placements_result'][0][r, c])
             
         current_afterstates_t = torch.FloatTensor(np.array(current_afterstates)).to(self.device)
         
@@ -122,19 +122,20 @@ class DVNAgent1P(BaseAgent):
                 next_rewards = []
                 # Simulation du 1-step lookahead pour évaluer l'état t+1
                 for a in valid_actions:
-                    r, c = a // self.grid_size, a % self.grid_size
-                    next_afterstate, next_reward = next_state['placements_result'][r, c]
+                    r, c = self._from_action_to_coordinates(a)
+                    next_afterstate, next_reward = next_state['placements_result'][0][r, c], next_state['placements_result'][1][r, c]
                     next_afterstates.append(next_afterstate)
                     next_rewards.append(next_reward)
                     
                 n_boards_t = torch.FloatTensor(np.array(next_afterstates)).to(self.device)
                 
                 with torch.no_grad():
-                    # Le réseau cible (Target Network) évalue les grilles de l'instant t+1
-                    v_vals = self.target_net(n_boards_t).squeeze(-1).cpu().numpy()
+                    v_vals = self.target_net(n_boards_t).squeeze(-1)
                 
-                q_vals = np.array(next_rewards) + self.gamma * v_vals
-                target_v[idx] = np.max(q_vals)
+                next_rewards = np.array(next_rewards)
+                next_reward = torch.FloatTensor(next_rewards).to(self.device)
+                q_vals = next_reward + self.gamma * v_vals
+                target_v[idx] = torch.max(q_vals) # max_a' [ R_t+2 + gamma * V(S_after_t+1) ]
                 
         # Assemblage final de la cible TD
         target_q = rewards + (self.gamma * target_v)
