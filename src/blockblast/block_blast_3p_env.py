@@ -41,6 +41,12 @@ class BlockBlast3PEnv(gym.Env):
             "pieces_used": spaces.MultiBinary(self.n_pieces),
             "combo":       spaces.Box(low=0, high=np.inf, shape=(1,), dtype=np.int32),
             "valid_placements": spaces.Box(low=0, high=1, shape=(self.n_pieces, self.grid_size, self.grid_size), dtype=np.int8),
+            "placements_result": spaces.Box(
+                low=0,
+                high=1,
+                shape=(self.n_pieces, self.grid_size, self.grid_size, self.grid_size, self.grid_size),
+                dtype=np.int8,
+            ),
         })
 
         self.shapes_keys = list(SHAPES.keys())
@@ -60,6 +66,7 @@ class BlockBlast3PEnv(gym.Env):
         self.combo = 0
         self.round_had_clear = False
         self.valid_placements = None
+        self.placements_result = None
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -69,6 +76,7 @@ class BlockBlast3PEnv(gym.Env):
         self.pieces_used = np.zeros(self.n_pieces, dtype=np.int8)
         self._sample_new_pieces()
         self._update_all_valid_placements()
+        self.placements_result = self._get_all_placements_result()
 
         if self.render_mode == "human":
             self.render()
@@ -101,9 +109,11 @@ class BlockBlast3PEnv(gym.Env):
             self.pieces_used = np.zeros(self.n_pieces, dtype=np.int8)
             self._sample_new_pieces()
             self._update_all_valid_placements()
+            self.placements_result = self._get_all_placements_result()
             terminated = not np.any(self.valid_placements)
         else:
             self._update_all_valid_placements()
+            self.placements_result = self._get_all_placements_result()
             terminated = not np.any(self.valid_placements)
 
         if self.render_mode == "human":
@@ -118,6 +128,7 @@ class BlockBlast3PEnv(gym.Env):
             "pieces_used": self.pieces_used.copy(),
             "combo":       np.array([self.combo], dtype=np.int32),
             "valid_placements": self.valid_placements.copy(),
+            "placements_result": self.placements_result.copy(),
         }
 
     def _get_info(self):
@@ -148,6 +159,45 @@ class BlockBlast3PEnv(gym.Env):
             windowed_board = sliding_window_view(self.board, window_shape=shape_grid.shape)
             overlaps = (windowed_board & shape_grid).any(axis=(-2, -1))
             self.valid_placements[i, :self.grid_size - h + 1, :self.grid_size - w + 1] = (~overlaps).astype(np.int8)
+
+    def _get_all_placements_result(self):
+        """
+        For each piece and each possible (row, col) placement, return the
+        resulting board after placing the piece and clearing lines.
+        Invalid placements (including used pieces) get an all-blocked grid.
+        """
+        results = np.ones(
+            (self.n_pieces, self.grid_size, self.grid_size, self.grid_size, self.grid_size),
+            dtype=np.int8,
+        )
+
+        for i in range(self.n_pieces):
+            if self.pieces_used[i]:
+                # keep default all-blocked grids
+                continue
+
+            shape_grid = self.pieces_grids[i]
+            h, w = shape_grid.shape
+
+            max_row = self.grid_size - h + 1
+            max_col = self.grid_size - w + 1
+
+            for row in range(max_row):
+                for col in range(max_col):
+                    if not self.valid_placements[i, row, col]:
+                        continue
+
+                    board_copy = self.board.copy()
+                    board_copy[row : row + h, col : col + w] += shape_grid
+
+                    full_rows = np.all(board_copy == 1, axis=1)
+                    full_cols = np.all(board_copy == 1, axis=0)
+                    board_copy[full_rows, :] = 0
+                    board_copy[:, full_cols] = 0
+
+                    results[i, row, col] = board_copy
+
+        return results
 
     def _place_piece(self, shape_grid, row, col):
         h, w = shape_grid.shape
