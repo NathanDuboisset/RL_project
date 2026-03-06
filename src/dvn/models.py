@@ -39,7 +39,9 @@ class BlockBlastValueNet1P(nn.Module):
         """
         x_board = board.unsqueeze(1).float() 
         features = self.board_conv(x_board)
-        return self.fc(features)
+        out = self.fc(features)
+        
+        return torch.relu(out) #we know that score >= 0
     
 if __name__ == "__main__":
     # Test rapide du modèle
