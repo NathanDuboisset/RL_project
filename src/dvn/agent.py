@@ -1,0 +1,164 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import random
+from collections import deque
+from src.dqn.agent import BaseAgent  # On réutilise votre classe de base
+from .models import BlockBlastValueNet1P
+from abc import abstractmethod, ABC
+
+
+class DVNAgent1P(BaseAgent):
+    def __init__(self, action_size=64, lr=1e-4, gamma=0.99, buffer_size=10000, batch_size=64, device = None):
+        self.action_size = action_size
+        self.gamma = gamma
+        self.batch_size = batch_size
+        if device == None :
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
+
+        self.policy_net = BlockBlastValueNet1P().to(self.device)
+        self.target_net = BlockBlastValueNet1P().to(self.device)
+        self.update_target_model() # identical weights at the start
+        
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+        self.memory = deque(maxlen=buffer_size) # Replay Buffer
+        # self.loss_fn = nn.SmoothL1Loss() # Huber Loss
+        self.loss_fn = nn.MSELoss() # Mean Squared Error Loss
+        self.grid_size = 8
+        self.base_points = 10
+
+    def update_target_model(self):
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+
+    def store_transition(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
+
+    def _from_action_to_coordinates(self, action):
+        row = action // self.grid_size
+        col = action % self.grid_size
+        return row, col
+
+    def _from_coordinates_to_action(self, row, col):
+        return row * self.grid_size + col
+
+
+    def select_action(self, state, epsilon):
+        """
+        Sélectionne l'action maximisant l'équation de Bellman prospective:
+        a* = argmax_a [ r(s,a) + gamma * V(S_after(s,a)) ]
+        """
+        valid_mask = state['valid_placements'].flatten()
+        valid_actions = np.flatnonzero(valid_mask)
+        
+        if len(valid_actions) == 0:
+            return random.randint(0, self.action_size - 1)
+
+        if random.random() < epsilon:
+            return random.choice(valid_actions)
+            
+        afterstates = []
+        rewards = []
+        
+        for a in valid_actions:
+            r, c = self._from_action_to_coordinates(a)
+            hyp_next_board, hyp_reward = state['placements_result'][r, c]
+            rewards.append(hyp_reward)
+            afterstates.append(hyp_next_board)
+
+        boards_tensor = torch.FloatTensor(np.array(afterstates)).to(self.device)
+        
+        with torch.no_grad():
+            v_values = self.policy_net(boards_tensor).squeeze(-1).cpu().numpy()
+            
+        q_estimates = np.array(rewards) + self.gamma * v_values
+        best_idx = np.argmax(q_estimates)
+        
+        return valid_actions[best_idx]
+
+    def update_model(self):
+        """
+        Minimise l'erreur de différence temporelle (TD Error) par MSE.
+        L(theta) = E [ (Target - V_theta(S_after_t))^2 ]
+        """
+        if len(self.memory) < self.batch_size:
+            return None
+
+        # Échantillonnage aléatoire pour briser les corrélations temporelles
+        batch = random.sample(self.memory, self.batch_size)
+        
+        current_afterstates = []
+        for s in batch:
+            state, action = s[0], s[1]
+            r, c = action // self.grid_size, action % self.grid_size
+            # On récupère la grille exacte après le placement joué
+            current_afterstates.append(state['placements_result'][r, c])
+            
+        current_afterstates_t = torch.FloatTensor(np.array(current_afterstates)).to(self.device)
+        
+        # Le réseau principal évalue la grille qui a été choisie à l'instant t
+        current_v = self.policy_net(current_afterstates_t)
+        
+        rewards = torch.FloatTensor([s[2] for s in batch]).to(self.device).view(-1, 1)
+        dones = torch.FloatTensor([s[4] for s in batch]).to(self.device).view(-1, 1)
+        
+        # 2. Cible temporelle : Target = R_t+1 + gamma * max_a' [ R_t+2 + gamma * V(S_after_t+1) ]
+        target_v = torch.zeros((self.batch_size, 1), device=self.device)
+        non_final_indices = torch.where(dones == 0)[0].cpu().numpy()
+        
+        if len(non_final_indices) > 0:
+            for idx in non_final_indices:
+                next_state = batch[idx][3]
+                valid_mask = next_state['valid_placements'].flatten()
+                valid_actions = np.flatnonzero(valid_mask)
+                
+                # Si l'état suivant n'a aucune action valide (le joueur va mourir au prochain tour)
+                if len(valid_actions) == 0:
+                    continue
+                    
+                next_afterstates = []
+                next_rewards = []
+                # Simulation du 1-step lookahead pour évaluer l'état t+1
+                for a in valid_actions:
+                    r, c = a // self.grid_size, a % self.grid_size
+                    next_afterstate, next_reward = next_state['placements_result'][r, c]
+                    next_afterstates.append(next_afterstate)
+                    next_rewards.append(next_reward)
+                    
+                n_boards_t = torch.FloatTensor(np.array(next_afterstates)).to(self.device)
+                
+                with torch.no_grad():
+                    # Le réseau cible (Target Network) évalue les grilles de l'instant t+1
+                    v_vals = self.target_net(n_boards_t).squeeze(-1).cpu().numpy()
+                
+                q_vals = np.array(next_rewards) + self.gamma * v_vals
+                target_v[idx] = np.max(q_vals)
+                
+        # Assemblage final de la cible TD
+        target_q = rewards + (self.gamma * target_v)
+        
+        loss = self.loss_fn(current_v, target_q)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        
+        return loss.item()
+
+        
+
+    def save_model(self, path):
+        """Save architecture and weights"""
+        torch.save({
+            'policy_state_dict': self.policy_net.state_dict(),
+            'target_state_dict': self.target_net.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+        }, path)
+
+    def load_model(self, path):
+        """Load a saved model from path"""
+        checkpoint = torch.load(path)
+        self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
+        self.target_net.load_state_dict(checkpoint['target_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
