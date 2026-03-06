@@ -6,9 +6,10 @@ dist/
 wheels/
 *.egg-info
 *$py.class
-
+wandb/
 # 
 .venv
+
 
 # training data
 checkpoints/
