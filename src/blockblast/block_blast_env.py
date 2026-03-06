@@ -150,6 +150,8 @@ class BlockBlastEnv(gym.Env):
         max_row = self.grid_size - h + 1
         max_col = self.grid_size - w + 1
 
+        rewards = np.zeros((self.grid_size, self.grid_size), dtype=np.float32)
+
         for row in range(max_row):
             for col in range(max_col):
                 if not self.valid_placements[row, col]:
@@ -165,8 +167,15 @@ class BlockBlastEnv(gym.Env):
                 board_copy[:, full_cols] = 0
 
                 results[row, col] = board_copy
+                
+                #apply same reward logic as in the real env step for hypothetical reward calculation
+                reward = 0.1
+                lines_cleared = np.sum(full_rows) + np.sum(full_cols)
+                if lines_cleared > 0:
+                    reward = self.base_points * (lines_cleared ** 2)
+                rewards[row, col] = reward
 
-        return results
+        return results,rewards
 
     def _place_piece(self, shape_grid, row, col):
         h, w = shape_grid.shape
