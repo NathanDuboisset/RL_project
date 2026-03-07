@@ -47,6 +47,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
 
     wandb.watch(agent.policy_net, log="all", log_freq=10)
     epsilon = eps_start
+    iteration = 0
 
     for episode in tqdm(range(1, num_episodes + 1), desc="Entraînement"):
         obs, _ = env.reset()
@@ -68,15 +69,15 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
                 
             episode_return += reward
             obs = next_obs
-            
+
+            if iteration % target_update_freq == 0:
+                agent.update_target_model()
+            iteration += 1
             if done:
                 break
 
         epsilon = max(eps_end, epsilon * eps_decay)
         
-        if episode % target_update_freq == 0:
-            agent.update_target_model()
-            
         avg_loss = np.mean(episode_losses) if len(episode_losses) > 0 else 0.0
         
         wandb.log({
@@ -102,16 +103,17 @@ def main():
     env = BlockBlastEnv()
     agent = DVNAgent1P(
         lr = 1e-4,
-        buffer_size=50_000,
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        buffer_size=100_000,
+        batch_size=128,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
     train_agent(env, agent,
-                num_episodes=5000,
+                num_episodes=10_000,
                 max_steps_per_episode=100,
                 eps_start=1.0,
                 eps_end=0.01,
-                eps_decay=0.998,
-                target_update_freq=10,
+                eps_decay=0.999,
+                target_update_freq=200,
                 checkpoint_freq=500,
                 project_name="blockblast-rl",
                 run_name=run_name)
