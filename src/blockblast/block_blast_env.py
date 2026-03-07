@@ -80,13 +80,13 @@ class BlockBlastEnv(gym.Env):
         col = action % self.grid_size
 
         if not self.valid_placements[row, col]:
-            return self._get_obs(), -1.0, True, False, self._get_info()
+            return self._get_obs(), -50.0, True, False, self._get_info()
 
         self._place_piece(self.current_shape_grid, row, col)
         lines_cleared = self._clear_lines()
 
         # small reward for surviving, bigger reward for clearing lines
-        reward = 0.1
+        reward = 5
         if lines_cleared > 0:
             reward = self.base_points * (lines_cleared ** 2)
 
