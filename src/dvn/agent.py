@@ -10,10 +10,11 @@ from abc import abstractmethod, ABC
 
 
 class DVNAgent1P(BaseAgent):
-    def __init__(self, action_size=64, lr=1e-4, gamma=0.99, buffer_size=10000, batch_size=64, device = None):
+    def __init__(self, action_size=64, lr=1e-4, gamma=0.99, buffer_size=10000, batch_size=64, punish_for_invalid=-500.0, device = None):
         self.action_size = action_size
         self.gamma = gamma
         self.batch_size = batch_size
+        self.punish_for_invalid = punish_for_invalid
         if device == None :
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
@@ -105,8 +106,13 @@ class DVNAgent1P(BaseAgent):
         rewards = torch.FloatTensor([s[2] for s in batch]).to(self.device).view(-1, 1)
         dones = torch.FloatTensor([s[4] for s in batch]).to(self.device).view(-1, 1)
         
-        # 2. Cible temporelle : Target = R_t+1 + gamma * max_a' [ R_t+2 + gamma * V(S_after_t+1) ]
+        # Cible temporelle : Target = R_t+1 + gamma * max_a' [ R_t+2 + gamma * V(S_after_t+1) ]
         target_v = torch.zeros((self.batch_size, 1), device=self.device)
+
+        final_indices = torch.where(dones == 1)[0].cpu().numpy()
+        if len(final_indices) > 0:
+            target_v[final_indices] = self.punish_for_invalid #On sait que ces transitions sont invalides, donc on applique la pénalité directement
+
         non_final_indices = torch.where(dones == 0)[0].cpu().numpy()
         
         if len(non_final_indices) > 0:

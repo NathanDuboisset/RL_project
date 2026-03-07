@@ -107,13 +107,14 @@ def main():
     run_name = f"DVN_1P_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     env = BlockBlastEnv(
         reward_for_survival=5,
-        punish_for_invalid=-1000.0,
+        punish_for_invalid=-500.0,
         base_points=10
     )
     agent = DVNAgent1P(
         lr = 1e-4,
         buffer_size=100_000,
         batch_size=128,
+        punish_for_invalid=-500.0,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
     train_agent(env, agent,
