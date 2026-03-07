@@ -24,7 +24,7 @@ class DVNAgent1P(BaseAgent):
         self.update_target_model() # identical weights at the start
         
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=10)
+        self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.99)
         self.memory = deque(maxlen=buffer_size) # Replay Buffer
         self.loss_fn = nn.SmoothL1Loss() # Huber Loss
         #self.loss_fn = nn.MSELoss() # Mean Squared Error Loss
@@ -143,7 +143,7 @@ class DVNAgent1P(BaseAgent):
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=10.0)
-        self.scheduler.step(loss)
+        self.scheduler.step()
         self.optimizer.step()
         
         return loss.item()
