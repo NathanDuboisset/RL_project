@@ -107,7 +107,7 @@ def main():
     run_name = f"DVN_1P_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     env = BlockBlastEnv(
         reward_for_survival=5,
-        punish_for_invalid=-100.0,
+        punish_for_invalid=-1000.0,
         base_points=10
     )
     agent = DVNAgent1P(
