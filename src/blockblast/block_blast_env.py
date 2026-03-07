@@ -98,6 +98,8 @@ class BlockBlastEnv(gym.Env):
         self.valid_placements = self._get_valid_placements(self.current_shape_grid)
         self.placements_result = self._get_placements_result(self.current_shape_grid)
         terminated = not np.any(self.valid_placements)
+        if terminated:
+            reward += self.punish_for_invalid
 
         if self.render_mode == "human":
             self.render()
