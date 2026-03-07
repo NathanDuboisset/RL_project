@@ -41,7 +41,12 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
             "gamma": agent.gamma,
             "batch_size": agent.batch_size,
             "target_update_freq": target_update_freq,
-            "action_size": agent.action_size
+            "action_size": agent.action_size,
+            "buffer_size": agent.memory.maxlen,
+            "initial_learning_rate": agent.optimizer.param_groups[0]['lr'],
+            "reward_for_survival": env.reward_for_survival,
+            "punish_for_invalid": env.punish_for_invalid,
+            "base_points": env.base_points
         }
     )
 
@@ -100,7 +105,11 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
 
 def main():
     run_name = f"DVN_1P_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    env = BlockBlastEnv()
+    env = BlockBlastEnv(
+        reward_for_survival=5,
+        punish_for_invalid=-100.0,
+        base_points=10
+    )
     agent = DVNAgent1P(
         lr = 1e-4,
         buffer_size=100_000,
