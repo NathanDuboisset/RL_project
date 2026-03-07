@@ -12,18 +12,18 @@ class BlockBlastValueNet1P(nn.Module):
         # Le réseau prend en entrée la grille résultante (1 seul canal)
         self.board_conv = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=4, padding=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Conv2d(32, 64, kernel_size=4, padding=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Flatten()
         )
         size_entree = 2304 
         
         self.fc = nn.Sequential(
             nn.Linear(size_entree, 512),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(512, 256),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(256, 1) # V(S') : Valeur scalaire unique
         )
 
