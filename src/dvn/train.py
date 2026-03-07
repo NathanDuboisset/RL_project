@@ -85,7 +85,8 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
             "Episode Length (Steps)": step + 1, # type: ignore
             "Exploration Rate (Epsilon)": epsilon,
             "Average TD Loss": avg_loss,
-            "Mean Learning Rate": np.mean([param_group['lr'] for param_group in agent.optimizer.param_groups])
+            "Mean Learning Rate": np.mean([param_group['lr'] for param_group in agent.optimizer.param_groups]),
+            "Buffer size" : len(agent.memory)
         })
         
         if episode % checkpoint_freq == 0:
@@ -100,7 +101,7 @@ def main():
     run_name = f"DVN_1P_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     env = BlockBlastEnv()
     agent = DVNAgent1P(
-        lr = 1e-5,
+        lr = 1e-4,
         buffer_size=50_000,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
     )
