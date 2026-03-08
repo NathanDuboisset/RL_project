@@ -111,7 +111,8 @@ class DVNAgent1P(BaseAgent):
 
         final_indices = torch.where(dones == 1)[0].cpu().numpy()
         if len(final_indices) > 0:
-            target_v[final_indices] = self.punish_for_invalid #On sait que ces transitions sont invalides, donc on applique la pénalité directement
+            #On sait que ces transitions sont invalides, donc on applique la pénalité directement
+            target_v[final_indices] = self.punish_for_invalid/self.gamma 
 
         non_final_indices = torch.where(dones == 0)[0].cpu().numpy()
         
