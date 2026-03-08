@@ -99,7 +99,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
             path = f"checkpoints/dvn_ep_{episode}.pt"
             agent.save_model(path)
             
-    path = f"checkpoints/dvn_final.pt"
+    path = f"checkpoints/dvn_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pt"
     agent.save_model(path)
     wandb.finish()
 
