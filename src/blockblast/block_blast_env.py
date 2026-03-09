@@ -22,12 +22,16 @@ class BlockBlastEnv(gym.Env):
             self, 
             render_mode=None, 
             base_points=10, 
+            reward_for_survival=5,
+            punish_for_invalid=-100.0,
             shape_probs=None
     ):
         super().__init__()
         
         self.render_mode = render_mode
         self.base_points = base_points
+        self.reward_for_survival = reward_for_survival
+        self.punish_for_invalid = punish_for_invalid
         self.grid_size = 8
         self.piece_box_size = 5
         
@@ -80,13 +84,13 @@ class BlockBlastEnv(gym.Env):
         col = action % self.grid_size
 
         if not self.valid_placements[row, col]:
-            return self._get_obs(), -1.0, True, False, self._get_info()
+            return self._get_obs(), self.punish_for_invalid, True, False, self._get_info()
 
         self._place_piece(self.current_shape_grid, row, col)
         lines_cleared = self._clear_lines()
 
         # small reward for surviving, bigger reward for clearing lines
-        reward = 0.1
+        reward = self.reward_for_survival
         if lines_cleared > 0:
             reward = self.base_points * (lines_cleared ** 2)
 
@@ -94,6 +98,8 @@ class BlockBlastEnv(gym.Env):
         self.valid_placements = self._get_valid_placements(self.current_shape_grid)
         self.placements_result = self._get_placements_result(self.current_shape_grid)
         terminated = not np.any(self.valid_placements)
+        if terminated:
+            reward += self.punish_for_invalid
 
         if self.render_mode == "human":
             self.render()
@@ -105,7 +111,7 @@ class BlockBlastEnv(gym.Env):
             "board": self.board.copy(),
             "piece": self.current_piece.copy(),
             "valid_placements": self.valid_placements.copy(),
-            "placements_result": self.placements_result.copy(),
+            "placements_result": (self.placements_result[0].copy(), self.placements_result[1].copy()),
         }
 
     def _get_info(self):
@@ -150,9 +156,12 @@ class BlockBlastEnv(gym.Env):
         max_row = self.grid_size - h + 1
         max_col = self.grid_size - w + 1
 
+        rewards = np.zeros((self.grid_size, self.grid_size), dtype=np.float32)
+
         for row in range(max_row):
             for col in range(max_col):
                 if not self.valid_placements[row, col]:
+                    rewards[row, col] = self.punish_for_invalid
                     continue
 
                 board_copy = self.board.copy()
@@ -165,8 +174,15 @@ class BlockBlastEnv(gym.Env):
                 board_copy[:, full_cols] = 0
 
                 results[row, col] = board_copy
+                
+                #apply same reward logic as in the real env step for hypothetical reward calculation
+                reward = self.reward_for_survival
+                lines_cleared = np.sum(full_rows) + np.sum(full_cols)
+                if lines_cleared > 0:
+                    reward = self.base_points * (lines_cleared ** 2)
+                rewards[row, col] = reward
 
-        return results
+        return results,rewards
 
     def _place_piece(self, shape_grid, row, col):
         h, w = shape_grid.shape
