@@ -10,10 +10,11 @@ class BlockBlastValueNet1P(nn.Module):
         super(BlockBlastValueNet1P, self).__init__()
         
         # Le réseau prend en entrée la grille résultante (1 seul canal)
+        kernel_size = 4
         self.board_conv = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=4, padding=1),
+            nn.Conv2d(1, 32, kernel_size=kernel_size, padding=1),
             nn.LeakyReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, padding=1),
+            nn.Conv2d(32, 64, kernel_size=kernel_size, padding=1),
             nn.LeakyReLU(),
             nn.Flatten()
         )
