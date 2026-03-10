@@ -21,8 +21,8 @@ class BlockBlastEnv(gym.Env):
     def __init__(
             self, 
             render_mode=None, 
-            base_points=10, 
-            reward_for_survival=5,
+            base_points=10., 
+            reward_for_survival=5.,
             punish_for_invalid=-100.0,
             shape_probs=None
     ):
@@ -78,6 +78,12 @@ class BlockBlastEnv(gym.Env):
             self.render()
 
         return self._get_obs(), self._get_info()
+    
+    def _get_hyp_reward(self, lines_cleared):
+        reward = self.reward_for_survival
+        if lines_cleared > 0:
+            reward += self.base_points * (lines_cleared)
+        return reward
 
     def step(self, action):
         row = action // self.grid_size
@@ -90,9 +96,7 @@ class BlockBlastEnv(gym.Env):
         lines_cleared = self._clear_lines()
 
         # small reward for surviving, bigger reward for clearing lines
-        reward = self.reward_for_survival
-        if lines_cleared > 0:
-            reward = self.base_points * (lines_cleared ** 2)
+        reward = self._get_hyp_reward(lines_cleared)
 
         self._sample_new_piece()
         self.valid_placements = self._get_valid_placements(self.current_shape_grid)
@@ -176,10 +180,8 @@ class BlockBlastEnv(gym.Env):
                 results[row, col] = board_copy
                 
                 #apply same reward logic as in the real env step for hypothetical reward calculation
-                reward = self.reward_for_survival
                 lines_cleared = np.sum(full_rows) + np.sum(full_cols)
-                if lines_cleared > 0:
-                    reward = self.base_points * (lines_cleared ** 2)
+                reward = self._get_hyp_reward(lines_cleared)
                 rewards[row, col] = reward
 
         return results,rewards
