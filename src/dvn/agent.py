@@ -150,8 +150,8 @@ class DVNAgent1P(BaseAgent):
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=10.0)
-        self.scheduler.step()
         self.optimizer.step()
+        self.scheduler.step()
         
         return loss.item()
 
