@@ -76,6 +76,53 @@ class BlockBlastValueNet1Pmultikernel(nn.Module):
         features = torch.cat([branch(x) for branch in self.branches], dim=1)
         return self.fc(features)
 
+class BlockBlastValueNet1PmultikernelFlattenned(nn.Module):
+    """
+    CNN more kernels
+    """
+    def __init__(self):
+        super(BlockBlastValueNet1PmultikernelFlattenned, self).__init__()
+
+        sizes = [1, 2, 3, 4, 5, 8]
+        filter_sizes = [1, 8, 16, 16, 16, 64]
+        line_sizes = [8]
+        board = 8
+        output_kernels=8
+
+        all_kernels = (
+            [(k, k, filter_size) for k,filter_size in zip(sizes, filter_sizes)] +
+            [(1, k, 4) for k in line_sizes] +
+            [(k, 1, 4) for k in line_sizes]
+        )
+
+        self.branches = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(1, filter_size, kernel_size=(kh, kw), padding=0),
+                nn.LeakyReLU(),
+                nn.Flatten(),
+                nn.Linear((board - kh + 1) * (board - kw + 1) * filter_size, 16),
+                nn.LeakyReLU(),
+                nn.Linear(16, output_kernels),
+            )
+            for (kh, kw, filter_size) in all_kernels
+        ])
+
+        flat_sizes = [output_kernels for kh, kw, filter_size in all_kernels]
+        size_entree = sum(flat_sizes)
+
+        self.fc = nn.Sequential(
+            nn.Linear(size_entree, 64),
+            nn.LeakyReLU(),
+            nn.Linear(64, 16),
+            nn.LeakyReLU(),
+            nn.Linear(16, 1)
+        )
+
+    def forward(self, board):
+        x = board.unsqueeze(1).float()
+        features = torch.cat([branch(x) for branch in self.branches], dim=1)
+        return self.fc(features)
+
 if __name__ == "__main__":
     model = BlockBlastValueNet1P()
     dummy_board = torch.rand(4, 8, 8)
