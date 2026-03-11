@@ -5,7 +5,7 @@ from tqdm import tqdm
 from src.dvn.agent import DVNAgent1P
 from src.blockblast.block_blast_env import BlockBlastEnv
 from datetime import datetime
-
+from src.dvn.models import BlockBlastValueNet1Pmultikernel
 def train_agent(env: BlockBlastEnv, agent: DVNAgent1P, 
                 num_episodes:int, 
                 max_steps_per_episode:int, 
@@ -111,6 +111,7 @@ def main():
         base_points= 10.0
     )
     agent = DVNAgent1P(
+        policy_net=BlockBlastValueNet1Pmultikernel,
         lr = 1e-4,
         buffer_size=100_000,
         batch_size=128,
