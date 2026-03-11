@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 from numpy.lib.stride_tricks import sliding_window_view
 import gymnasium as gym
 from gymnasium import spaces
@@ -22,12 +23,14 @@ class BlockBlast3PEnv(gym.Env):
             self,
             render_mode=None,
             base_points=10,
+            lookahead_gamma=0.99,
             shape_probs=None
     ):
         super().__init__()
 
         self.render_mode = render_mode
         self.base_points = base_points
+        self.lookahead_gamma = lookahead_gamma
         self.grid_size = 8
         self.piece_box_size = 5
         self.n_pieces = 3
@@ -133,6 +136,91 @@ class BlockBlast3PEnv(gym.Env):
 
     def _get_info(self):
         return {}
+
+    def _valid_positions_for_piece_on_board(self, board, piece_idx):
+        """Compute valid (row, col) mask for one piece on a provided board."""
+        shape_grid = self.pieces_grids[piece_idx]
+        h, w = shape_grid.shape
+        valid_mask = np.zeros((self.grid_size, self.grid_size), dtype=np.int8)
+
+        windowed_board = sliding_window_view(board, window_shape=shape_grid.shape)
+        overlaps = (windowed_board & shape_grid).any(axis=(-2, -1))
+        valid_mask[: self.grid_size - h + 1, : self.grid_size - w + 1] = (~overlaps).astype(np.int8)
+        return valid_mask
+
+    def _simulate_one_hyp_step(self, board, combo, piece_idx, row, col):
+        """Apply one hypothetical placement and return (next_board, reward, next_combo)."""
+        shape_grid = self.pieces_grids[piece_idx]
+        h, w = shape_grid.shape
+
+        next_board = board.copy()
+        next_board[row : row + h, col : col + w] += shape_grid
+
+        full_rows = np.all(next_board == 1, axis=1)
+        full_cols = np.all(next_board == 1, axis=0)
+        n_cleared = int(np.sum(full_rows) + np.sum(full_cols))
+        next_board[full_rows, :] = 0
+        next_board[:, full_cols] = 0
+
+        reward = 0.1
+        next_combo = combo
+        if n_cleared > 0:
+            reward = self.base_points * (n_cleared ** 2 + combo)
+            next_combo = combo + n_cleared
+
+        return next_board, float(reward), int(next_combo)
+
+    def get_t_plus_3_candidates(self, gamma):
+        """
+        Return all possible S_(t+3) states and discounted 3-step rewards.
+
+        Enumerates all 3! piece orders and all valid placements for each order.
+        Output item fields:
+        - state_t_plus_3: np.ndarray (8, 8)
+        - cumulative_reward_3steps: r_t + gamma*r_t+1 + gamma^2*r_t+2
+        - order: tuple of piece indices
+        - actions: ((piece,row,col), (piece,row,col), (piece,row,col))
+        """
+        if self.board is None or self.pieces_grids is None or self.pieces_used is None:
+            return []
+
+        available = [i for i in range(self.n_pieces) if not self.pieces_used[i]]
+        if len(available) < 3:
+            return []
+
+        candidates = []
+        board0 = self.board.copy()
+        combo0 = int(self.combo)
+
+        for order in itertools.permutations(available, 3):
+            p0, p1, p2 = order
+
+            valid0 = self._valid_positions_for_piece_on_board(board0, p0)
+            rows0, cols0 = np.nonzero(valid0)
+            for r0, c0 in zip(rows0.tolist(), cols0.tolist()):
+                board1, r_t, combo1 = self._simulate_one_hyp_step(board0, combo0, p0, r0, c0)
+
+                valid1 = self._valid_positions_for_piece_on_board(board1, p1)
+                rows1, cols1 = np.nonzero(valid1)
+                for r1, c1 in zip(rows1.tolist(), cols1.tolist()):
+                    board2, r_t1, combo2 = self._simulate_one_hyp_step(board1, combo1, p1, r1, c1)
+
+                    valid2 = self._valid_positions_for_piece_on_board(board2, p2)
+                    rows2, cols2 = np.nonzero(valid2)
+                    for r2, c2 in zip(rows2.tolist(), cols2.tolist()):
+                        board3, r_t2, _ = self._simulate_one_hyp_step(board2, combo2, p2, r2, c2)
+                        cum_reward = r_t + gamma * r_t1 + (gamma ** 2) * r_t2
+
+                        candidates.append(
+                            {
+                                "state_t_plus_3": board3.copy(),
+                                "cumulative_reward_3steps": float(cum_reward),
+                                "order": order,
+                                "actions": ((p0, r0, c0), (p1, r1, c1), (p2, r2, c2)),
+                            }
+                        )
+
+        return candidates
 
     def _sample_new_pieces(self):
         self.pieces_grids = []
