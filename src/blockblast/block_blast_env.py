@@ -24,6 +24,7 @@ class BlockBlastEnv(gym.Env):
             base_points=10., 
             reward_for_survival=5.,
             punish_for_invalid=-100.0,
+            no_free_3x3_penalty=20.0,
             shape_probs=None
     ):
         super().__init__()
@@ -32,6 +33,7 @@ class BlockBlastEnv(gym.Env):
         self.base_points = base_points
         self.reward_for_survival = reward_for_survival
         self.punish_for_invalid = punish_for_invalid
+        self.no_free_3x3_penalty = no_free_3x3_penalty
         self.grid_size = 8
         self.piece_box_size = 5
         
@@ -79,10 +81,22 @@ class BlockBlastEnv(gym.Env):
 
         return self._get_obs(), self._get_info()
     
-    def _get_hyp_reward(self, lines_cleared):
+    def _has_free_3x3_square(self, board_state):
+        windows = sliding_window_view(board_state, (3, 3))
+        # A free 3x3 exists if any 3x3 window is fully empty.
+        return np.any(np.all(windows == 0, axis=(-2, -1)))
+
+    def _get_hyp_reward(self, lines_cleared, board_state=None):
+        board_to_score = self.board if board_state is None else board_state
+        emptiness_ratio = float(np.sum(board_to_score == 0)) / float(self.grid_size * self.grid_size)
+
         reward = self.reward_for_survival
-        if lines_cleared > 0:
-            reward += self.base_points * (lines_cleared)
+        reward += self.base_points * lines_cleared
+        reward += self.base_points * emptiness_ratio
+
+        if not self._has_free_3x3_square(board_to_score):
+            reward -= self.no_free_3x3_penalty
+
         return reward
 
     def step(self, action):
@@ -181,7 +195,7 @@ class BlockBlastEnv(gym.Env):
                 
                 #apply same reward logic as in the real env step for hypothetical reward calculation
                 lines_cleared = np.sum(full_rows) + np.sum(full_cols)
-                reward = self._get_hyp_reward(lines_cleared)
+                reward = self._get_hyp_reward(lines_cleared, board_copy)
                 rewards[row, col] = reward
 
         return results,rewards
