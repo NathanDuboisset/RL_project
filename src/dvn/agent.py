@@ -5,23 +5,22 @@ import numpy as np
 import random
 from collections import deque
 from src.dqn.agent import BaseAgent
-from .models import BlockBlastValueNet1Pmultikernel
 from abc import abstractmethod, ABC
 
 
 class DVNAgent1P(BaseAgent):
-    def __init__(self, action_size=64, lr=1e-4, gamma=0.99, buffer_size=10000, batch_size=64, punish_for_invalid=-500.0, device = None):
+    def __init__(self, policy_net: type[nn.Module], action_size=64, lr=1e-4, gamma=0.99, buffer_size=10000, batch_size=64, punish_for_invalid=-500.0, device = None):
         self.action_size = action_size
         self.gamma = gamma
         self.batch_size = batch_size
         self.punish_for_invalid = punish_for_invalid
-        if device == None :
+        if device is None :
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
 
-        self.policy_net = BlockBlastValueNet1Pmultikernel().to(self.device)
-        self.target_net = BlockBlastValueNet1Pmultikernel().to(self.device)
+        self.policy_net = policy_net().to(self.device)
+        self.target_net = policy_net().to(self.device)
         self.update_target_model()
         
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
