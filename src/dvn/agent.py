@@ -5,7 +5,7 @@ import numpy as np
 import random
 from collections import deque
 from src.dqn.agent import BaseAgent
-from .models import BlockBlastValueNet1P
+from .models import BlockBlastValueNet1Pmultikernel
 from abc import abstractmethod, ABC
 
 
@@ -20,8 +20,8 @@ class DVNAgent1P(BaseAgent):
         else:
             self.device = device
 
-        self.policy_net = BlockBlastValueNet1P().to(self.device)
-        self.target_net = BlockBlastValueNet1P().to(self.device)
+        self.policy_net = BlockBlastValueNet1Pmultikernel().to(self.device)
+        self.target_net = BlockBlastValueNet1Pmultikernel().to(self.device)
         self.update_target_model()
         
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
