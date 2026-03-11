@@ -1,7 +1,19 @@
+import sys
+from pathlib import Path
+
 import wandb
 import numpy as np
 import torch
 from tqdm import tqdm
+
+# Allow running this file directly without requiring editable installation.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = PROJECT_ROOT / "src"
+for path in (PROJECT_ROOT, SRC_ROOT):
+    path_str = str(path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
+
 from src.dvn.agent import DVNAgent1P
 from src.blockblast.block_blast_env import BlockBlastEnv
 from datetime import datetime
@@ -107,14 +119,14 @@ def main():
     run_name = f"DVN_1P_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     env = BlockBlastEnv(
         reward_for_survival= 5.0,
-        punish_for_invalid= -1000.0,
+        punish_for_invalid= -500.0,
         base_points= 10.0
     )
     agent = DVNAgent1P(
         lr = 1e-4,
         buffer_size=100_000,
         batch_size=128,
-        punish_for_invalid=-1000.0,
+        punish_for_invalid=-500.0,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
     train_agent(env, agent,
