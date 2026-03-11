@@ -19,7 +19,7 @@ for path in (PROJECT_ROOT, SRC_ROOT):
 from src.dvn.agent import DVNAgent1P
 from src.blockblast.block_blast_env import BlockBlastEnv
 from datetime import datetime
-from src.dvn.models import BlockBlastValueNet1Pmultikernel
+from src.dvn.models import *
 
 
 def _torch_load_compat(path: str, map_location: torch.device) -> dict[str, Any]:
@@ -234,7 +234,7 @@ def main():
         base_points= 10.0
     )
     agent = DVNAgent1P(
-        policy_net=BlockBlastValueNet1Pmultikernel,
+        policy_net=BlockBlastValueNet1PmultikernelFlattenned,
         lr = 1e-4,
         buffer_size=100_000,
         batch_size=128,
