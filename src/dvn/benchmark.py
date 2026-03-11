@@ -69,6 +69,14 @@ def load_dvn_agent(checkpoint_path: Path, device: str) -> DVNAgent1P:
     return agent
 
 
+def random_action(obs: dict, rng: np.random.Generator) -> int:
+    valid_mask = obs["valid_placements"].reshape(-1).astype(bool)
+    valid_actions = np.flatnonzero(valid_mask)
+    if valid_actions.size == 0:
+        return 0
+    return int(rng.choice(valid_actions))
+
+
 def greedy_action(obs: dict) -> int:
     valid_mask = obs["valid_placements"].reshape(-1).astype(bool)
     valid_actions = np.flatnonzero(valid_mask)
@@ -95,6 +103,7 @@ def run_policy(
     episode_returns: list[float] = []
     episode_lengths: list[int] = []
     step_rewards: list[float] = []
+    rng = np.random.default_rng(seed=seed)
 
     for ep in tqdm(range(episodes), desc=f"Eval {policy_name}"):
         obs, _ = env.reset(seed=seed + ep)
@@ -106,6 +115,8 @@ def run_policy(
                 action = dvn_action(agent, obs)
             elif policy_name == "greedy":
                 action = greedy_action(obs)
+            elif policy_name == "random":
+                action = random_action(obs, rng)
             else:
                 raise ValueError(f"Unknown policy: {policy_name}")
 
@@ -142,25 +153,28 @@ def print_summary(name: str, metrics: dict[str, np.ndarray]) -> None:
 def save_distribution_plots(
     dvn_metrics: dict[str, np.ndarray],
     greedy_metrics: dict[str, np.ndarray],
+    random_metrics: dict[str, np.ndarray],
     output_dir: Path,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fig_path = output_dir / f"benchmark_dvn_vs_greedy_{timestamp}.png"
+    fig_path = output_dir / f"benchmark_dvn_vs_greedy_vs_random_{timestamp}.png"
 
     plt.figure(figsize=(12, 5))
 
     plt.subplot(1, 2, 1)
-    plt.hist(dvn_metrics["episode_returns"], bins=30, alpha=0.6, label="DVN")
-    plt.hist(greedy_metrics["episode_returns"], bins=30, alpha=0.6, label="Greedy")
+    plt.hist(dvn_metrics["episode_returns"], bins=30, alpha=0.55, label="DVN")
+    plt.hist(greedy_metrics["episode_returns"], bins=30, alpha=0.55, label="Greedy")
+    plt.hist(random_metrics["episode_returns"], bins=30, alpha=0.55, label="Random")
     plt.title("Episode Reward Distribution")
     plt.xlabel("Episode Reward")
     plt.ylabel("Frequency")
     plt.legend()
 
     plt.subplot(1, 2, 2)
-    plt.hist(dvn_metrics["episode_lengths"], bins=30, alpha=0.6, label="DVN")
-    plt.hist(greedy_metrics["episode_lengths"], bins=30, alpha=0.6, label="Greedy")
+    plt.hist(dvn_metrics["episode_lengths"], bins=30, alpha=0.55, label="DVN")
+    plt.hist(greedy_metrics["episode_lengths"], bins=30, alpha=0.55, label="Greedy")
+    plt.hist(random_metrics["episode_lengths"], bins=30, alpha=0.55, label="Random")
     plt.title("Episode Length Distribution")
     plt.xlabel("Episode Length")
     plt.ylabel("Frequency")
@@ -181,6 +195,7 @@ def main() -> None:
 
     env_dvn = BlockBlastEnv(punish_for_invalid=-100)
     env_greedy = BlockBlastEnv(punish_for_invalid=-100)
+    env_random = BlockBlastEnv(punish_for_invalid=-100)
 
     agent = load_dvn_agent(checkpoint_path=checkpoint_path, device=args.device)
 
@@ -199,13 +214,22 @@ def main() -> None:
         max_steps=args.max_steps,
         seed=args.seed,
     )
+    random_metrics = run_policy(
+        env=env_random,
+        policy_name="random",
+        episodes=args.episodes,
+        max_steps=args.max_steps,
+        seed=args.seed,
+    )
 
     print_summary("dvn", dvn_metrics)
     print_summary("greedy", greedy_metrics)
+    print_summary("random", random_metrics)
 
     fig_path = save_distribution_plots(
         dvn_metrics=dvn_metrics,
         greedy_metrics=greedy_metrics,
+        random_metrics=random_metrics,
         output_dir=Path(args.output_dir),
     )
 
