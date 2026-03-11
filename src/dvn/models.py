@@ -46,27 +46,35 @@ class BlockBlastValueNet1P(nn.Module):
 class BlockBlastValueNet1Pmultikernel(nn.Module):
     """
     CNN pour estimer la valeur d'une position dans Block Blast.
-    Convolutions parallèles avec kernels 1,2,3,4,5,8 sur grille 8x8,
-    concaténées puis passées dans un MLP à une couche cachée de 128.
+    Convolutions parallèles avec kernels carrés (k×k), horizontaux (1×k)
+    et verticaux (k×1) pour k in [1,2,3,4,5,8], concaténées puis MLP.
     """
     def __init__(self):
         super(BlockBlastValueNet1Pmultikernel, self).__init__()
 
-        # One conv branch per kernel size, no padding → single stage
-        kernel_sizes = [1, 2, 3, 4, 5, 8]
+        sizes = [1, 2, 3, 4, 5, 8]
+        line_sizes = [2, 3, 4, 5, 8]  # 1×1 already covered by square k=1
         n_filters = 32
+        board = 8
+
+        # All kernel shapes: square (k,k), horizontal (1,k), vertical (k,1)
+        all_kernels = (
+            [(k, k) for k in sizes] +
+            [(1, k) for k in line_sizes] +
+            [(k, 1) for k in line_sizes]
+        )
+
         self.branches = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(1, n_filters, kernel_size=k, padding=0),
+                nn.Conv2d(1, n_filters, kernel_size=(kh, kw), padding=0),
                 nn.LeakyReLU(),
                 nn.Flatten()
             )
-            for k in kernel_sizes
+            for kh, kw in all_kernels
         ])
 
-        # Output sizes for each branch on an 8x8 board: (8 - k + 1)^2 * n_filters
-        flat_sizes = [((8 - k + 1) ** 2) * n_filters for k in kernel_sizes]
-        size_entree = sum(flat_sizes)  # 2048+1568+1152+800+512+32 = 6112
+        flat_sizes = [(board - kh + 1) * (board - kw + 1) * n_filters for kh, kw in all_kernels]
+        size_entree = sum(flat_sizes)
 
         self.fc = nn.Sequential(
             nn.Linear(size_entree, 512),
