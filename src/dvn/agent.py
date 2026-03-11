@@ -4,7 +4,7 @@ import torch.optim as optim
 import numpy as np
 import random
 from collections import deque
-from src.dqn.agent import BaseAgent  # On réutilise votre classe de base
+from src.dqn.agent import BaseAgent
 from .models import BlockBlastValueNet1P
 from abc import abstractmethod, ABC
 
@@ -22,13 +22,12 @@ class DVNAgent1P(BaseAgent):
 
         self.policy_net = BlockBlastValueNet1P().to(self.device)
         self.target_net = BlockBlastValueNet1P().to(self.device)
-        self.update_target_model() # identical weights at the start
+        self.update_target_model()
         
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.99)
-        self.memory = deque(maxlen=buffer_size) # Replay Buffer
-        self.loss_fn = nn.SmoothL1Loss() # Huber Loss
-        #self.loss_fn = nn.MSELoss() # Mean Squared Error Loss
+        self.memory = deque(maxlen=buffer_size)
+        self.loss_fn = nn.SmoothL1Loss()
         self.grid_size = 8
         self.base_points = 10
 
@@ -88,30 +87,24 @@ class DVNAgent1P(BaseAgent):
         if len(self.memory) < self.batch_size:
             return None
 
-        # Échantillonnage aléatoire pour briser les corrélations temporelles
         batch = random.sample(self.memory, self.batch_size)
         
         current_afterstates = []
         for s in batch:
             state, action = s[0], s[1]
             r, c = self._from_action_to_coordinates(action)
-            # On récupère la grille exacte après le placement joué
             current_afterstates.append(state['placements_result'][0][r, c])
             
         current_afterstates_t = torch.FloatTensor(np.array(current_afterstates)).to(self.device)
-        
-        # Le réseau principal évalue la grille qui a été choisie à l'instant t
         current_v = self.policy_net(current_afterstates_t)
         
         rewards = torch.FloatTensor([s[2] for s in batch]).to(self.device).view(-1, 1)
         dones = torch.FloatTensor([s[4] for s in batch]).to(self.device).view(-1, 1)
         
-        # Cible temporelle : Target = R_t+1 + gamma * max_a' [ R_t+2 + gamma * V(S_after_t+1) ]
         target_v = torch.zeros((self.batch_size, 1), device=self.device)
 
         final_indices = torch.where(dones == 1)[0].cpu().numpy()
         if len(final_indices) > 0:
-            #On sait que ces transitions sont invalides, donc on applique la pénalité directement
             target_v[final_indices] = self.punish_for_invalid/self.gamma 
 
         non_final_indices = torch.where(dones == 0)[0].cpu().numpy()
@@ -122,13 +115,11 @@ class DVNAgent1P(BaseAgent):
                 valid_mask = next_state['valid_placements'].flatten()
                 valid_actions = np.flatnonzero(valid_mask)
                 
-                # Si l'état suivant n'a aucune action valide (le joueur va mourir au prochain tour)
                 if len(valid_actions) == 0:
                     continue
                     
                 next_afterstates = []
                 next_rewards = []
-                # Simulation du 1-step lookahead pour évaluer l'état t+1
                 for a in valid_actions:
                     r, c = self._from_action_to_coordinates(a)
                     next_afterstate, next_reward = next_state['placements_result'][0][r, c], next_state['placements_result'][1][r, c]
@@ -143,7 +134,7 @@ class DVNAgent1P(BaseAgent):
                 next_rewards = np.array(next_rewards)
                 next_reward = torch.FloatTensor(next_rewards).to(self.device)
                 q_vals = next_reward + self.gamma * v_vals
-                target_v[idx] = torch.max(q_vals) # max_a' [ R_t+2 + gamma * V(S_after_t+1) ]
+                target_v[idx] = torch.max(q_vals)
                 
             
         loss = self.loss_fn(current_v, target_v) 
