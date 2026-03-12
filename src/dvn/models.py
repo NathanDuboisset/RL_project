@@ -84,7 +84,7 @@ class BlockBlastValueNet1PmultikernelFlattenned(nn.Module):
         super(BlockBlastValueNet1PmultikernelFlattenned, self).__init__()
 
         sizes = [1, 2, 3, 4, 5, 8]
-        filter_sizes = [1, 8, 16, 16, 16, 64]
+        filter_sizes = [1, 6, 8, 8, 16, 32]
         line_sizes = [8]
         board = 8
         output_kernels = 8
