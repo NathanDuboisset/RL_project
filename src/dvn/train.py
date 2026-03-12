@@ -99,9 +99,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
                 model_update_freq:int = 1,
                 resume_model_path: Optional[str] = None,
                 resume_state_path: Optional[str] = None,
-                project_name="blockblast-rl", 
-
-                run_name=None):
+                project_name="blockblast-rl", run_name=None):
     """
     Boucle d'entraînement formelle pour un agent RL (TD-Learning / Q-Learning).
     
@@ -141,7 +139,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
 
     wandb.watch(agent.policy_net, log="all", log_freq=10)
 
-    checkpoints_dir = Path("checkpoints")
+    checkpoints_dir = Path("/Data/KAT/checkpoints/")
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
     epsilon = eps_start
