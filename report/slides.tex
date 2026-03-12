@@ -1,0 +1,677 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\usefonttheme{professionalfonts}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{colortbl}
+
+\definecolor{blockblue}{RGB}{30,90,180}
+\definecolor{blockorange}{RGB}{220,100,20}
+\definecolor{blockgreen}{RGB}{30,150,80}
+
+\setbeamercolor{frametitle}{bg=blockblue!85!black, fg=white}
+\setbeamercolor{title}{fg=white}
+\setbeamercolor{author}{fg=white}
+\setbeamercolor{date}{fg=white}
+\setbeamercolor{institute}{fg=white}
+\setbeamercolor{block title}{bg=blockblue!70, fg=white}
+\setbeamercolor{block body}{bg=blockblue!8}
+\setbeamercolor{alerted text}{fg=blockorange}
+
+\lstset{
+    basicstyle=\ttfamily\scriptsize,
+    breaklines=true,
+    backgroundcolor=\color{gray!10},
+    keywordstyle=\color{blockblue}\bfseries,
+    commentstyle=\color{blockgreen}\itshape,
+    frame=single,
+    language=Python
+}
+
+\title[\textbf{RL for Block Blast}]{\textbf{Reinforcement Learning for Block Blast}}
+\subtitle{From Deep Q-Networks to Deep Value Networks}
+\author{Nathan}
+\date{March 2026}
+
+\AtBeginSection[]{
+  \begin{frame}
+    \frametitle{Outline}
+    \tableofcontents[currentsection]
+  \end{frame}
+}
+
+\begin{document}
+
+%-----------------------------------------------------------------------------
+\begin{frame}
+\titlepage
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+%=============================================================================
+\section{The Game: Block Blast}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Block Blast: Overview}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\begin{block}{Game Rules}
+\begin{itemize}
+    \item $8\times8$ binary grid (0 = empty, 1 = filled)
+    \item Place Tetromino-like pieces on the grid
+    \item \textbf{Clearing}: any full row \emph{or} column is cleared
+    \item \textbf{Game over}: no valid placements remain
+\end{itemize}
+\end{block}
+
+\vspace{0.4em}
+\begin{block}{7 Piece Shapes}
+Dot, $2\times2$, $3\times3$, Line-3, Line-4, L-small, L-large\\
+\footnotesize Each randomly rotated (0°, 90°, 180°, 270°)
+\end{block}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{alertblock}{RL Challenges}
+\begin{itemize}
+    \item Long-horizon planning
+    \item Large action space ($\leq 64$ / step)
+    \item Sparse rewards
+    \item Combinatorial structure (3P)
+\end{itemize}
+\end{alertblock}
+
+\vspace{0.4em}
+\begin{exampleblock}{Two Variants}
+\begin{itemize}
+    \item \textbf{1P}: one piece at a time
+    \item \textbf{3P}: three pieces per round, free order
+\end{itemize}
+\end{exampleblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Environment: Single-Piece Variant (1P)}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{block}{Observation (Dict)}
+\begin{itemize}
+    \item \texttt{board}: $8\times8$ int grid
+    \item \texttt{piece}: $5\times5$ padded shape
+    \item \texttt{valid\_placements}: $8\times8$ mask
+    \item \texttt{placements\_result}: \emph{precomputed} $(8,8,8,8)$ afterstate tensor + reward map
+\end{itemize}
+\end{block}
+
+\begin{block}{Action Space}
+$\text{Discrete}(64)$ — action $a = 8r + c$\\
+places piece top-left at $(r,c)$
+\end{block}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{block}{Key Feature: Afterstates}
+\vspace{0.3em}
+The environment \textbf{precomputes} the resulting board for every valid placement before the agent acts.
+
+\vspace{0.5em}
+\[
+\texttt{placements\_result}[r,c] = (s'_{r,c},\; r_{r,c})
+\]
+\vspace{0.3em}
+This is the core enabler of the DVN approach.
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Environment: Three-Piece Variant (3P)}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\begin{block}{3P Rules}
+\begin{itemize}
+    \item 3 pieces presented per \textbf{round}
+    \item Agent plays all 3 in \textbf{any chosen order}
+    \item \texttt{pieces\_used}: binary vector tracking played pieces
+    \item \texttt{combo}: counter accumulating cleared lines across placements
+\end{itemize}
+\end{block}
+
+\begin{block}{Action Space}
+$\text{Discrete}(192) = \text{piece\_idx} \times 64 + r \times 8 + c$
+\end{block}
+\end{column}
+
+\begin{column}{0.46\textwidth}
+\begin{alertblock}{3P Lookahead API}
+\texttt{get\_t\_plus\_3\_candidates($\gamma$)}
+\vspace{0.3em}
+\begin{itemize}
+    \item Enumerates all $3! = 6$ orderings
+    \item For each: all valid positions per piece
+    \item Returns \emph{terminal board}, \emph{cumulative reward}, \emph{action sequence}
+\end{itemize}
+Used by the DVN 3P planner (see Section 4).
+\end{alertblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%=============================================================================
+\section{Reward Shaping}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Reward Shaping: First Attempt}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{block}{Quadratic Combo Reward}
+\[
+r = b \cdot n_{\text{cleared}}^2, \quad b = 10
+\]
+\vspace{0.2em}
+Intuition: strongly incentivise clearing multiple lines at once.
+\end{block}
+
+\vspace{0.5em}
+\begin{exampleblock}{3P Variant (kept)}
+\[
+r = b \cdot (n_{\text{cleared}}^2 + \text{combo})
+\]
+The \texttt{combo} counter rewards sustained clearing streaks across rounds.
+\end{exampleblock}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{alertblock}{Why It Failed for 1P}
+\begin{itemize}
+    \item Clearing $\geq 2$ lines at once is \textbf{rare early in training}
+    \item Most steps give $r = 0$: \textbf{extremely sparse signal}
+    \item Agent cannot learn what placement is ``good'' without feedback
+    \item Training diverges or stalls
+\end{itemize}
+\end{alertblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Reward Shaping: Final Design (1P)}
+\begin{block}{Final Reward Function}
+\[
+r = \underbrace{r_{\text{survive}}}_{5.0}
+  + \underbrace{b \cdot n_{\text{cleared}}}_{10 \times \#\text{cleared lines}}
+  + \underbrace{b \cdot \rho}_{\text{emptiness bonus}}
+  - \underbrace{p_{\text{no3x3}}}_{20 \text{ if no free }3\times3}
+\]
+\end{block}
+
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{exampleblock}{Components}
+\begin{itemize}
+    \item $r_{\text{survive}} = 5$: reward for not dying
+    \item $n_{\text{cleared}}$: rows + columns cleared
+    \item $\rho \in [0,1]$: fraction of \textbf{empty cells} — keeps board clean
+    \item $p_{\text{no3x3}} = 20$: penalty if no $3\times3$ empty window exists (``too full'')
+\end{itemize}
+\end{exampleblock}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{alertblock}{Invalid Move}
+Penalty $-100$, \textbf{episode terminates}.
+\end{alertblock}
+
+\vspace{0.5em}
+\begin{block}{Design Philosophy}
+Dense signal at \emph{every} step, not just when lines clear. The emptiness ratio teaches the agent to \textbf{preserve space} for future pieces.
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%=============================================================================
+\section{DQN-Based Approaches}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DDQN and Rainbow: Architecture}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{\texttt{BlockBlastCNNNet1P} Backbone}
+\begin{tabular}{ll}
+\toprule
+Layer & Output \\
+\midrule
+Board + mask $(2,8,8)$ & \\
+Conv2d($2\to32$, $k=3$) & $32\times8\times8$ \\
+Conv2d($32\to64$, $k=3$) & $64\times8\times8$ \\
+Flatten & 4096 \\
+\midrule
+Piece $(1,5,5)$ & \\
+Conv2d($1\to32$, $k=3$) & $32\times5\times5$ \\
+Flatten & 800 \\
+\midrule
+Concat & 4896 \\
+Linear $4896\to512\to256\to64$ & 64 Q-values \\
+\bottomrule
+\end{tabular}
+\end{block}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{alertblock}{\textbf{2,674,464 parameters}}
+\end{alertblock}
+
+\vspace{0.5em}
+\begin{block}{Rainbow Extensions}
+\begin{enumerate}
+    \item Distributional RL (C51, 51 atoms)
+    \item Prioritized Replay (PER)
+    \item N-step returns ($n=3$)
+    \item Noisy Networks
+    \item Dueling Architecture
+\end{enumerate}
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DQN: Why It Struggled}
+\begin{alertblock}{Root Causes of Poor Performance}
+\begin{enumerate}
+    \item \textbf{Credit assignment}: a good placement may not clear a line for 3+ more steps. With $\gamma=0.99$, the discounted signal is weak over long horizons.
+
+    \vspace{0.3em}
+    \item \textbf{Q-function instability}: 64 action outputs, highly variable valid masks step-to-step. Q-values must track a non-stationary landscape.
+
+    \vspace{0.3em}
+    \item \textbf{Sample efficiency}: 2.67M parameters, only 1,000 training episodes. The model is severely underfit.
+
+    \vspace{0.3em}
+    \item \textbf{Perception overhead}: the network must simultaneously learn to recognise piece shapes, valid positions, \emph{and} long-term board value. This is a hard joint problem.
+\end{enumerate}
+\end{alertblock}
+
+\begin{exampleblock}{Key Insight}
+DQN treats this as a raw perception problem. We can do better by \textbf{leveraging the environment structure}.
+\end{exampleblock}
+\end{frame}
+
+%=============================================================================
+\section{Deep Value Network (DVN)}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DVN: Afterstate Formulation}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{Core Idea}
+Instead of learning $Q(s, a)$, learn a \textbf{state value function}:
+\[
+V_\theta(s') \approx \text{long-term value of board } s'
+\]
+where $s'$ is the board \emph{after} placement and line clearing.
+\end{block}
+
+\vspace{0.5em}
+\begin{block}{Action Selection (1-step lookahead)}
+\[
+a^* = \arg\max_a \left[ r_a + \gamma \cdot V_\theta(s'_a) \right]
+\]
+Enumerate all valid afterstates $\{s'_a, r_a\}$ via \texttt{placements\_result}, batch-evaluate $V_\theta$, pick best.
+\end{block}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{exampleblock}{Advantages over DQN}
+\begin{itemize}
+    \item Network only evaluates \textbf{boards}, not (board, action) pairs
+    \item Valid constraint handled implicitly
+    \item Value captures board quality \textbf{independently of current piece}
+    \item Much simpler function to learn
+\end{itemize}
+\end{exampleblock}
+
+\begin{alertblock}{Key Requirement}
+Environment must expose precomputed afterstates. Our \texttt{placements\_result} does exactly this.
+\end{alertblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DVN Architecture: Multi-Kernel CNN}
+\begin{columns}[T]
+\begin{column}{0.52\textwidth}
+\begin{block}{8 Parallel Branches on $8\times8$ Board}
+\footnotesize
+\begin{tabular}{llcc}
+\toprule
+Kernel & Role & Filters & Pad \\
+\midrule
+$1\times1$  & Per-cell occupancy     & 1  & 0 \\
+$2\times2$  & Small block patterns   & 8  & 1 \\
+$3\times3$  & Piece-size patterns    & 16 & 1 \\
+$4\times4$  & Medium structures      & 16 & 2 \\
+$5\times5$  & Larger structures      & 16 & 2 \\
+$8\times8$  & Global board summary   & 64 & 0 \\
+$1\times8$  & \alert{Row detector}   & 4  & 0 \\
+$8\times1$  & \alert{Column detector}& 4  & 0 \\
+\bottomrule
+\end{tabular}
+\end{block}
+\end{column}
+
+\begin{column}{0.44\textwidth}
+\begin{block}{Wall Padding}
+Padding uses \texttt{ConstantPad2d} with value \textbf{1.0}: the kernel sees ``filled wall cells'' outside the grid boundary.
+
+\vspace{0.3em}
+\footnotesize No padding for line kernels ($1\times8$, $8\times1$).
+\end{block}
+
+\vspace{0.4em}
+\begin{block}{Branch Output}
+Each branch: Conv $\to$ LeakyReLU $\to$ Flatten $\to$ Linear$(\cdot\to16)$ $\to$ Linear$(16\to8)$
+
+\vspace{0.3em}
+Concat: $8 \times 8 = \mathbf{64}$ features
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DVN Architecture: MLP Head \& Parameter Count}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\begin{block}{MLP Head}
+\[
+64 \xrightarrow{\text{Linear}} 64 \xrightarrow{\text{LReLU}} 16 \xrightarrow{\text{LReLU}} 1
+\]
+Scalar output: $V_\theta(s')$
+\end{block}
+
+\vspace{0.5em}
+\begin{exampleblock}{Total: \textbf{42,461 parameters}}
+$63\times$ fewer than DDQN/Rainbow!
+\end{exampleblock}
+\end{column}
+
+\begin{column}{0.46\textwidth}
+\begin{block}{Model Comparison}
+\begin{tabular}{lc}
+\toprule
+Model & Params \\
+\midrule
+DDQN 1P   & 2,674,464 \\
+Rainbow 1P & 2,674,464 \\
+DDQN 3P   & 2,710,560 \\
+\midrule
+\textbf{DVN (ours)} & \textbf{42,461} \\
+\bottomrule
+\end{tabular}
+\end{block}
+\end{column}
+\end{columns}
+
+\vspace{0.5em}
+\begin{exampleblock}{Why so small?}
+The network only needs to answer: \emph{``Is this board position good for the long term?''} It does not need to reason about pieces, action encodings, or valid masks.
+\end{exampleblock}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DVN: Training}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\begin{block}{TD Learning on Afterstates}
+\textbf{Target} (non-terminal):
+\[
+y_t = \max_{a'} \left[ r_{t+1,a'} + \gamma \cdot V_{\theta^-}(s'_{t+1,a'}) \right]
+\]
+\textbf{Target} (terminal):
+\[
+y_t = \frac{p_{\text{invalid}}}{\gamma}
+\]
+\textbf{Loss}: Huber (SmoothL1) + grad clip $\leq 10$
+\end{block}
+\end{column}
+
+\begin{column}{0.46\textwidth}
+\begin{block}{Training Protocol}
+\begin{itemize}
+    \item 10,000 episodes, max 100 steps
+    \item $\varepsilon$: $1.0 \to 0.01$, decay $\times 0.999$/ep
+    \item Buffer: 100,000 transitions
+    \item Batch size: 128
+    \item Adam, lr $= 10^{-4}$, StepLR
+    \item Target net update: every 200 ep
+    \item Logged via \textbf{Weights \& Biases}
+    \item Checkpoints every 500 ep (full state)
+\end{itemize}
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DVN: 3P Planner}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{\texttt{RoundPlanner3P}}
+At each new round:
+\begin{enumerate}
+    \item Call \texttt{get\_t\_plus\_3\_candidates($\gamma$)}
+    \item Score each candidate sequence:
+    \[
+    \text{score} = R_{t+1:t+3} + \gamma^3 \cdot V_\theta(s_{t+3})
+    \]
+    \item Select \textbf{best 3-action sequence}
+    \item Execute one action at a time
+    \item \textbf{Replan} if an action becomes invalid
+\end{enumerate}
+\end{block}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{alertblock}{Computational Cost}
+Full enumeration: $3! \times 64^3$ candidates in the worst case.
+\vspace{0.3em}
+
+Pure Python/NumPy: \textbf{very slow} for online evaluation.
+
+\vspace{0.3em}
+\textit{Future work}: batched GPU lookahead.
+\end{alertblock}
+
+\vspace{0.3em}
+\begin{exampleblock}{Key Feature}
+The DVN value function is \textbf{shared} between 1P and 3P — the planner is just a wrapper around the same $V_\theta$.
+\end{exampleblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%=============================================================================
+\section{Results}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Benchmark: DVN vs.\ Greedy vs.\ Random}
+\begin{center}
+\includegraphics[width=0.90\textwidth]{../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png}
+\end{center}
+\vspace{-0.3em}
+\footnotesize Episode return (left) and episode length (right) distributions over 200 evaluation episodes.
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Results Summary}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{Observations}
+\begin{itemize}
+    \item \textbf{Trained DVN}: $\sim$60 avg steps per episode
+    \item \textbf{Untrained DVN}: $\sim$20 steps (random play)
+    \item \textbf{Greedy baseline}: picks highest immediate reward — shortsighted, over-fills board
+    \item \textbf{DVN} outperforms greedy in episode length by learning to preserve board space
+\end{itemize}
+\end{block}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{tabular}{lcc}
+\toprule
+Agent & Avg Steps & Params \\
+\midrule
+Random      & $\sim$5  & --- \\
+Greedy      & $\sim$30 & --- \\
+DVN (untrained) & $\sim$20 & 42K \\
+\textbf{DVN (trained)} & $\mathbf{\sim 60}$ & \textbf{42K} \\
+DDQN 1P  & $\sim$20 & 2.67M \\
+Rainbow  & $\sim$20 & 2.67M \\
+\bottomrule
+\end{tabular}
+\end{column}
+\end{columns}
+
+\vspace{0.5em}
+\begin{exampleblock}{Takeaway}
+The DVN learns real long-term value with $63\times$ fewer parameters than DQN-based approaches, by leveraging environment structure (precomputed afterstates).
+\end{exampleblock}
+\end{frame}
+
+%=============================================================================
+\section{Discussion \& Future Work}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Discussion}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{exampleblock}{Why DVN $>$ DQN here}
+\begin{itemize}
+    \item Decouples \emph{``what does this board look like?''} from \emph{``which action achieves it?''}
+    \item No need to reason about piece geometry in the value net
+    \item Simpler learning objective = more sample-efficient
+    \item Valid constraints automatically respected
+\end{itemize}
+\end{exampleblock}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{alertblock}{Current Limitations}
+\begin{itemize}
+    \item Value function is \textbf{piece-agnostic}: a board's value depends on what pieces come next
+    \item 3P planner is \textbf{computationally expensive} (exhaustive enumeration)
+    \item Training still requires many episodes; no curriculum
+\end{itemize}
+\end{alertblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Future Work}
+\begin{block}{Immediate Improvements}
+\begin{itemize}
+    \item \textbf{Include upcoming piece info}: encode next piece(s) as extra input channels in $V_\theta$
+    \item \textbf{Hand-crafted feature branch}: holes count, row/column fill density, height variance — well-studied in Tetris literature
+    \item \textbf{Batch 3P lookahead on GPU}: use tensor operations over all $3! \times 64^3$ candidates for tractable online evaluation
+\end{itemize}
+\end{block}
+
+\vspace{0.5em}
+\begin{exampleblock}{Longer-Term Directions}
+\begin{itemize}
+    \item \textbf{MCTS + DVN}: use the value function as a rollout evaluator in Monte Carlo Tree Search for deeper planning
+    \item \textbf{Self-play curriculum}: progressively harder piece distributions
+    \item \textbf{Model-based RL}: learn a transition model from afterstates to plan deeper than 1-step
+\end{itemize}
+\end{exampleblock}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Conclusion}
+\begin{block}{Summary}
+\begin{enumerate}
+    \item Designed and implemented \textbf{two Block Blast environments} (1P and 3P) with Gymnasium, including precomputed afterstates
+    \item Iterated on \textbf{reward shaping}: quadratic combo reward was too sparse; dense survival + emptiness reward works better
+    \item \textbf{DDQN and Rainbow DQN} ($\sim$2.67M params) failed to converge meaningfully in 1,000 episodes due to sparse rewards and large Q-function complexity
+    \item \textbf{Deep Value Network} (42,461 params, multi-kernel CNN): learns $V(\text{afterstate})$ with TD learning, combined with 1-step lookahead for action selection
+    \item DVN achieves $\sim$60 average episode steps vs.\ $\sim$30 for greedy, with $63\times$ fewer parameters
+\end{enumerate}
+\end{block}
+
+\vspace{1em}
+\centering
+\textbf{Leveraging environment structure is more powerful than bigger models.}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\appendix
+\begin{frame}{Appendix: Benchmark (Earlier Run)}
+\begin{center}
+\includegraphics[width=0.72\textwidth]{../plots/benchmark_dvn_vs_greedy_20260311_123451.png}
+\end{center}
+\footnotesize Earlier benchmark comparing DVN vs.\ greedy only (before random baseline was added).
+\end{frame}
+
+\begin{frame}{Appendix: DVN Training Algorithm}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{Algorithm (simplified)}
+\footnotesize
+\textbf{Input:} $V_\theta$, target $V_{\theta^-}$, env, buffer $\mathcal{B}$\\[0.3em]
+\textbf{For} each episode:\\
+\quad \textbf{For} each step $t$:\\
+\quad\quad Compute all afterstates $\{(s'_a, r_a)\}$\\
+\quad\quad $a^* = \arg\max_a [r_a + \gamma V_\theta(s'_a)]$ (greedy)\\
+\quad\quad or sample random (exploration)\\
+\quad\quad Store $(s'_{a^*}, r_{a^*}, s_{\text{next}}, \text{done})$ in $\mathcal{B}$\\
+\quad\quad Sample batch from $\mathcal{B}$\\
+\quad\quad Compute TD targets $y_t$\\
+\quad\quad Update $\theta$ via Huber loss\\
+\quad Periodically: $\theta^- \leftarrow \theta$
+\end{block}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{block}{Hyperparameters}
+\begin{tabular}{ll}
+\toprule
+Param & Value \\
+\midrule
+$\gamma$ & 0.99 \\
+$\varepsilon_0 \to \varepsilon_{\min}$ & $1.0 \to 0.01$ \\
+Buffer size & 100,000 \\
+Batch size & 128 \\
+LR & $10^{-4}$ \\
+Target update & 200 ep \\
+\bottomrule
+\end{tabular}
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+\end{document}
