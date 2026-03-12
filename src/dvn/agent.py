@@ -29,6 +29,8 @@ class DVNAgent1P(BaseAgent):
         self.loss_fn = nn.SmoothL1Loss()
         self.grid_size = 8
         self.base_points = 10
+        self.action_rows = np.arange(self.action_size, dtype=np.int64) // self.grid_size
+        self.action_cols = np.arange(self.action_size, dtype=np.int64) % self.grid_size
 
     def update_target_model(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -58,22 +60,18 @@ class DVNAgent1P(BaseAgent):
 
         if random.random() < epsilon:
             return random.choice(valid_actions)
-            
-        afterstates = []
-        rewards = []
-        
-        for a in valid_actions:
-            r, c = self._from_action_to_coordinates(a)
-            hyp_next_board, hyp_reward = state['placements_result'][0][r, c], state['placements_result'][1][r, c]
-            rewards.append(hyp_reward)
-            afterstates.append(hyp_next_board)
 
-        boards_tensor = torch.FloatTensor(np.array(afterstates)).to(self.device)
-        
-        with torch.no_grad():
+        rows = self.action_rows[valid_actions]
+        cols = self.action_cols[valid_actions]
+        afterstates = state['placements_result'][0][rows, cols]
+        rewards = state['placements_result'][1][rows, cols]
+
+        boards_tensor = torch.from_numpy(afterstates.astype(np.float32, copy=False)).to(self.device)
+
+        with torch.inference_mode():
             v_values = self.policy_net(boards_tensor).squeeze(-1).cpu().numpy()
-            
-        q_estimates = np.array(rewards) + self.gamma * v_values
+
+        q_estimates = rewards + self.gamma * v_values
         best_idx = np.argmax(q_estimates)
         
         return valid_actions[best_idx]
@@ -87,62 +85,73 @@ class DVNAgent1P(BaseAgent):
             return None
 
         batch = random.sample(self.memory, self.batch_size)
-        
-        current_afterstates = []
-        for s in batch:
+
+        # --- Current afterstates (single batched forward pass) ---
+        current_afterstates = np.empty((self.batch_size, self.grid_size, self.grid_size), dtype=np.float32)
+        for i, s in enumerate(batch):
             state, action = s[0], s[1]
             r, c = self._from_action_to_coordinates(action)
-            current_afterstates.append(state['placements_result'][0][r, c])
-            
-        current_afterstates_t = torch.FloatTensor(np.array(current_afterstates)).to(self.device)
+            current_afterstates[i] = state['placements_result'][0][r, c]
+
+        current_afterstates_t = torch.from_numpy(current_afterstates).to(self.device)
         current_v = self.policy_net(current_afterstates_t)
-        
-        rewards = torch.FloatTensor([s[2] for s in batch]).to(self.device).view(-1, 1)
-        dones = torch.FloatTensor([s[4] for s in batch]).to(self.device).view(-1, 1)
-        
+
+        dones_np = np.array([s[4] for s in batch], dtype=np.float32)
         target_v = torch.zeros((self.batch_size, 1), device=self.device)
 
-        final_indices = torch.where(dones == 1)[0].cpu().numpy()
+        final_indices = np.where(dones_np == 1)[0]
         if len(final_indices) > 0:
-            target_v[final_indices] = self.punish_for_invalid/self.gamma 
+            target_v[final_indices] = self.punish_for_invalid / self.gamma
 
-        non_final_indices = torch.where(dones == 0)[0].cpu().numpy()
-        
+        non_final_indices = np.where(dones_np == 0)[0]
+
         if len(non_final_indices) > 0:
+            # Collect ALL next afterstates across all non-final samples,
+            # then do ONE batched forward pass instead of one per sample.
+            all_next_afterstates = []
+            all_next_rewards = []
+            sample_sizes = []
+
             for idx in non_final_indices:
                 next_state = batch[idx][3]
                 valid_mask = next_state['valid_placements'].flatten()
                 valid_actions = np.flatnonzero(valid_mask)
-                
-                if len(valid_actions) == 0:
+                n = len(valid_actions)
+                sample_sizes.append(n)
+                if n == 0:
                     continue
-                    
-                next_afterstates = []
-                next_rewards = []
-                for a in valid_actions:
-                    r, c = self._from_action_to_coordinates(a)
-                    next_afterstate, next_reward = next_state['placements_result'][0][r, c], next_state['placements_result'][1][r, c]
-                    next_afterstates.append(next_afterstate)
-                    next_rewards.append(next_reward)
-                    
-                n_boards_t = torch.FloatTensor(np.array(next_afterstates)).to(self.device)
-                
-                with torch.no_grad():
-                    v_vals = self.target_net(n_boards_t).squeeze(-1)
-                
-                next_rewards = np.array(next_rewards)
-                next_reward = torch.FloatTensor(next_rewards).to(self.device)
-                q_vals = next_reward + self.gamma * v_vals
-                target_v[idx] = torch.max(q_vals)
-                
-            
-        loss = self.loss_fn(current_v, target_v) 
+                rows = self.action_rows[valid_actions]
+                cols = self.action_cols[valid_actions]
+                all_next_afterstates.extend(next_state['placements_result'][0][rows, cols])
+                all_next_rewards.extend(next_state['placements_result'][1][rows, cols])
+
+            if all_next_afterstates:
+                n_boards_t = torch.from_numpy(
+                    np.array(all_next_afterstates, dtype=np.float32)
+                ).to(self.device)
+                next_rewards_t = torch.from_numpy(
+                    np.array(all_next_rewards, dtype=np.float32)
+                ).to(self.device)
+
+                with torch.inference_mode():
+                    all_v_vals = self.target_net(n_boards_t).squeeze(-1)
+
+                all_q_vals = next_rewards_t + self.gamma * all_v_vals
+
+                offset = 0
+                for i, idx in enumerate(non_final_indices):
+                    n = sample_sizes[i]
+                    if n > 0:
+                        target_v[idx] = torch.max(all_q_vals[offset:offset + n])
+                    offset += n
+
+        loss = self.loss_fn(current_v, target_v)
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=10.0)
         self.optimizer.step()
         self.scheduler.step()
-        
+
         return loss.item()
 
         
