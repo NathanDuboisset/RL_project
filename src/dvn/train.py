@@ -19,7 +19,7 @@ for path in (PROJECT_ROOT, SRC_ROOT):
 from src.dvn.agent import DVNAgent1P
 from src.blockblast.block_blast_env import BlockBlastEnv
 from datetime import datetime
-from src.dvn.models import BlockBlastValueNet1Pmultikernel
+from src.dvn.models import *
 
 
 def _torch_load_compat(path: str, map_location: torch.device) -> dict[str, Any]:
@@ -96,6 +96,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
                 eps_decay:float, 
                 target_update_freq:int, 
                 checkpoint_freq:int, 
+                model_update_freq:int = 1,
                 resume_model_path: Optional[str] = None,
                 resume_state_path: Optional[str] = None,
                 project_name="blockblast-rl", run_name=None):
@@ -138,7 +139,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
 
     wandb.watch(agent.policy_net, log="all", log_freq=10)
 
-    checkpoints_dir = Path("checkpoints")
+    checkpoints_dir = Path("/Data/KAT/checkpoints/")
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
     epsilon = eps_start
@@ -168,19 +169,21 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
             done = terminated or truncated
             
             agent.store_transition(obs, action, reward, next_obs, done)
-            
-            loss = agent.update_model()
-            if loss is not None:
-                episode_losses.append(loss)
-                
-            episode_return += reward
-            obs = next_obs
 
-            if iteration % target_update_freq == 0:
-                agent.update_target_model()
-            iteration += 1
-            if done:
-                break
+            if iteration % model_update_freq == 0:
+            
+                loss = agent.update_model()
+                if loss is not None:
+                    episode_losses.append(loss)
+                    
+                episode_return += reward
+                obs = next_obs
+
+                if iteration % target_update_freq == 0:
+                    agent.update_target_model()
+                iteration += 1
+                if done:
+                    break
 
         epsilon = max(eps_end, epsilon * eps_decay)
         
@@ -225,15 +228,15 @@ def main():
     run_name = f"DVN_1P_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     env = BlockBlastEnv(
         reward_for_survival= 5.0,
-        punish_for_invalid= -500.0,
+        punish_for_invalid= -100.0,
         base_points= 10.0
     )
     agent = DVNAgent1P(
-        policy_net=BlockBlastValueNet1Pmultikernel,
+        policy_net=BlockBlastValueNet1PmultikernelFlattenned,
         lr = 1e-4,
         buffer_size=100_000,
         batch_size=128,
-        punish_for_invalid=-500.0,
+        punish_for_invalid=-100.0,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
 

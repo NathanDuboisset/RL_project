@@ -14,4 +14,3 @@ wandb/
 # training data
 checkpoints/
 videos/
-plots/
