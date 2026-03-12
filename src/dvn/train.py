@@ -235,7 +235,7 @@ def main():
         policy_net=BlockBlastValueNet1PmultikernelFlattenned,
         lr = 1e-4,
         buffer_size=100_000,
-        batch_size=128,
+        batch_size=512,
         punish_for_invalid=-100.0,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
@@ -252,6 +252,7 @@ def main():
                 eps_decay=0.999,
                 target_update_freq=200,
                 checkpoint_freq=500,
+                model_update_freq=4,
                 resume_model_path=resume_model_path,
                 resume_state_path=resume_state_path,
                 project_name="blockblast-rl",
