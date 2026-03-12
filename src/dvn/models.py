@@ -87,31 +87,34 @@ class BlockBlastValueNet1PmultikernelFlattenned(nn.Module):
         filter_sizes = [1, 8, 16, 16, 16, 64]
         line_sizes = [8]
         board = 8
-        output_kernels=8
+        output_kernels = 8
+        pad = {1: 0, 2: 1, 3: 1, 4: 2, 5: 2, 8: 0}
 
+        # (kh, kw, filter_size, ph, pw)
         all_kernels = (
-            [(k, k, filter_size) for k,filter_size in zip(sizes, filter_sizes)] +
-            [(1, k, 4) for k in line_sizes] +
-            [(k, 1, 4) for k in line_sizes]
+            [(k, k, fs, pad[k], pad[k]) for k, fs in zip(sizes, filter_sizes)] +
+            [(1, k, 4, 0, 0) for k in line_sizes] +
+            [(k, 1, 4, 0, 0) for k in line_sizes]
         )
 
         self.branches = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(1, filter_size, kernel_size=(kh, kw), padding=1),
+                # Pad with 1 (wall) along each axis before the conv
+                nn.ConstantPad2d((pw, pw, ph, ph), 1.0),
+                nn.Conv2d(1, filter_size, kernel_size=(kh, kw), padding=0),
                 nn.LeakyReLU(),
                 nn.Flatten(),
-                nn.Linear((board - kh + 1) * (board - kw + 1) * filter_size, 16),
+                nn.Linear((board + 2*ph - kh + 1) * (board + 2*pw - kw + 1) * filter_size, 16),
                 nn.LeakyReLU(),
                 nn.Linear(16, output_kernels),
             )
-            for (kh, kw, filter_size) in all_kernels
+            for (kh, kw, filter_size, ph, pw) in all_kernels
         ])
 
-        flat_sizes = [output_kernels for kh, kw, filter_size in all_kernels]
-        size_entree = sum(flat_sizes)
+        flat_sizes = output_kernels * len(all_kernels)
 
         self.fc = nn.Sequential(
-            nn.Linear(size_entree, 64),
+            nn.Linear(flat_sizes, 64),
             nn.LeakyReLU(),
             nn.Linear(64, 16),
             nn.LeakyReLU(),
