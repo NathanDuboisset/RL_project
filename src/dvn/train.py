@@ -170,20 +170,20 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
             
             agent.store_transition(obs, action, reward, next_obs, done)
 
+            episode_return += reward
+            obs = next_obs
+
             if iteration % model_update_freq == 0:
             
                 loss = agent.update_model()
                 if loss is not None:
                     episode_losses.append(loss)
-                    
-                episode_return += reward
-                obs = next_obs
 
-                if iteration % target_update_freq == 0:
-                    agent.update_target_model()
-                iteration += 1
-                if done:
-                    break
+            if iteration % target_update_freq == 0:
+                agent.update_target_model()
+            iteration += 1
+            if done:
+                break
 
         epsilon = max(eps_end, epsilon * eps_decay)
         
@@ -250,7 +250,7 @@ def main():
                 eps_start=1.0,
                 eps_end=0.01,
                 eps_decay=0.999,
-                target_update_freq=200,
+                target_update_freq=800,
                 checkpoint_freq=500,
                 model_update_freq=4,
                 resume_model_path=resume_model_path,
