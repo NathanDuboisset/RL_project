@@ -97,7 +97,7 @@ class BlockBlastValueNet1PmultikernelFlattenned(nn.Module):
 
         self.branches = nn.ModuleList([
             nn.Sequential(
-                nn.Conv2d(1, filter_size, kernel_size=(kh, kw), padding=1),
+                nn.Conv2d(1, filter_size, kernel_size=(kh, kw), padding=0),
                 nn.LeakyReLU(),
                 nn.Flatten(),
                 nn.Linear((board - kh + 1) * (board - kw + 1) * filter_size, 16),
