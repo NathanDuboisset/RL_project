@@ -1,2 +1,1 @@
-$out_dir = '.latex';
-$aux_dir = '.latex';
+$pdf_mode = 1;
