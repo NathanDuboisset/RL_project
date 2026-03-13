@@ -3,9 +3,11 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import random
+import itertools
 from collections import deque
 from src.dqn.agent import BaseAgent
 from abc import abstractmethod, ABC
+from src.blockblast import BlockBlast3PEnv
 
 
 class DVNAgent1P(BaseAgent):
@@ -170,3 +172,165 @@ class DVNAgent1P(BaseAgent):
         self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
         self.target_net.load_state_dict(checkpoint['target_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+
+class RoundPlanner3P:
+    """
+    At the start of each round (3 new pieces), enumerates all possible 3-step
+    sequences via env.get_t_plus_3_candidates(), scores each terminal board
+    with the value network, and queues the best action sequence.
+    """
+
+    def __init__(self, gamma: float, agent: DVNAgent1P, eval_batch_size: int = 4096) -> None:
+        self.gamma = gamma
+        self.agent = agent
+        self.plan_actions: list[int] = []
+        self.eval_batch_size = max(1, int(eval_batch_size))
+
+    def reset_round_plan(self) -> None:
+        self.plan_actions = []
+
+    @staticmethod
+    def _fallback_random_action(env: BlockBlast3PEnv) -> list[int] | None:
+        valid_placements = env.valid_placements
+        if valid_placements is None:
+            return None
+        valid_actions = np.flatnonzero(valid_placements.reshape(-1))
+        if valid_actions.size == 0:
+            return None
+        return [int(np.random.choice(valid_actions))]
+
+    @staticmethod
+    def _encode_action(env: BlockBlast3PEnv, piece_idx: int, row: int, col: int) -> int:
+        return int(piece_idx * env.grid_size * env.grid_size + row * env.grid_size + col)
+
+    def _build_new_round_plan(self, env: BlockBlast3PEnv) -> list[int] | None:
+        # Fast path: stream 3-step candidates and evaluate in batches to avoid
+        # materializing large Python dict lists from get_t_plus_3_candidates().
+        if not all(
+            hasattr(env, attr)
+            for attr in ("board", "pieces_used", "_valid_positions_for_piece_on_board", "_simulate_one_hyp_step")
+        ):
+            candidates = env.get_t_plus_3_candidates(self.gamma)
+            if not candidates:
+                return self._fallback_random_action(env)
+
+            boards = np.stack([c["state_t_plus_3"] for c in candidates]).astype(np.float32)
+            cum3 = np.array([c["cumulative_reward_3steps"] for c in candidates], dtype=np.float32)
+
+            with torch.inference_mode():
+                x = torch.from_numpy(boards).to(self.agent.device)
+                v = self.agent.policy_net(x).squeeze(-1).detach().cpu().numpy().astype(np.float32)
+
+            scores = cum3 + (self.gamma ** 3) * v
+            best = int(np.argmax(scores))
+            return [
+                self._encode_action(env, p, r, c)
+                for (p, r, c) in candidates[best]["actions"]
+            ]
+
+        pieces_used = env.pieces_used
+        if pieces_used is None:
+            return self._fallback_random_action(env)
+
+        available = [i for i in range(env.n_pieces) if not pieces_used[i]]
+        if len(available) < 3:
+            return self._fallback_random_action(env)
+
+        gamma2 = self.gamma * self.gamma
+        gamma3 = gamma2 * self.gamma
+
+        board0 = env.board
+        combo0 = int(env.combo)
+
+        best_score = -np.inf
+        best_actions: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]] | None = None
+
+        batch_boards: list[np.ndarray] = []
+        batch_cum3: list[float] = []
+        batch_actions: list[tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]]] = []
+
+        def flush_batch() -> None:
+            nonlocal best_score, best_actions
+            if not batch_boards:
+                return
+
+            boards_np = np.asarray(batch_boards, dtype=np.float32)
+            cum_np = np.asarray(batch_cum3, dtype=np.float32)
+
+            with torch.inference_mode():
+                x = torch.from_numpy(boards_np).to(self.agent.device)
+                v = self.agent.policy_net(x).squeeze(-1).detach().cpu().numpy().astype(np.float32, copy=False)
+
+            scores = cum_np + gamma3 * v
+            local_best = int(np.argmax(scores))
+            local_score = float(scores[local_best])
+
+            if local_score > best_score:
+                best_score = local_score
+                best_actions = batch_actions[local_best]
+
+            batch_boards.clear()
+            batch_cum3.clear()
+            batch_actions.clear()
+
+        for p0, p1, p2 in itertools.permutations(available, 3):
+            valid0 = env._valid_positions_for_piece_on_board(board0, p0)
+            rows0, cols0 = np.nonzero(valid0)
+
+            for r0, c0 in zip(rows0.tolist(), cols0.tolist()):
+                board1, r_t, combo1 = env._simulate_one_hyp_step(board0, combo0, p0, r0, c0)
+
+                valid1 = env._valid_positions_for_piece_on_board(board1, p1)
+                rows1, cols1 = np.nonzero(valid1)
+                if rows1.size == 0:
+                    continue
+
+                for r1, c1 in zip(rows1.tolist(), cols1.tolist()):
+                    board2, r_t1, combo2 = env._simulate_one_hyp_step(board1, combo1, p1, r1, c1)
+
+                    valid2 = env._valid_positions_for_piece_on_board(board2, p2)
+                    rows2, cols2 = np.nonzero(valid2)
+                    if rows2.size == 0:
+                        continue
+
+                    cum2 = float(r_t + self.gamma * r_t1)
+                    a01 = ((p0, r0, c0), (p1, r1, c1))
+
+                    for r2, c2 in zip(rows2.tolist(), cols2.tolist()):
+                        board3, r_t2, _ = env._simulate_one_hyp_step(board2, combo2, p2, r2, c2)
+                        batch_boards.append(board3)
+                        batch_cum3.append(cum2 + gamma2 * float(r_t2))
+                        batch_actions.append((a01[0], a01[1], (p2, r2, c2)))
+
+                        if len(batch_boards) >= self.eval_batch_size:
+                            flush_batch()
+
+        flush_batch()
+
+        if best_actions is None:
+            return self._fallback_random_action(env)
+
+        return [self._encode_action(env, p, r, c) for (p, r, c) in best_actions]
+
+    def select_action(self, env: BlockBlast3PEnv) -> int | None:
+        if not self.plan_actions:
+            plan = self._build_new_round_plan(env)
+            if plan is None:
+                return None
+            self.plan_actions = plan
+
+        action = self.plan_actions.pop(0)
+
+        # Safety: if the pre-planned action became invalid (rare desync), rebuild
+        valid_placements = env.valid_placements
+        if valid_placements is None or not valid_placements.reshape(-1)[action]:
+            self.plan_actions = []
+            plan = self._build_new_round_plan(env)
+            if plan is None:
+                return None
+            self.plan_actions = plan
+            action = self.plan_actions.pop(0)
+
+        return action
+
