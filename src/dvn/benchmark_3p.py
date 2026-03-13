@@ -13,8 +13,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.blockblast.block_blast_3p_env import BlockBlast3PEnv
-from src.dvn.agent import DVNAgent1P
-from src.dvn.models import BlockBlastValueNet1Pmultikernel
+from src.dvn.agent import DVNAgent1P,RoundPlanner3P
+from src.dvn.models import BlockBlastValueNet1PmultikernelFlattenned
 from src.dvn.models import BlockBlastValueNet1P
 
 
@@ -69,7 +69,7 @@ def load_dvn_agent(checkpoint_path: Path, device: str) -> DVNAgent1P:
     checkpoint = torch.load(checkpoint_path, map_location=torch.device(device), weights_only=False)
     policy_keys = set(checkpoint["policy_state_dict"].keys())
     if any(k.startswith("branches.") for k in policy_keys):
-        model_cls = BlockBlastValueNet1Pmultikernel
+        model_cls = BlockBlastValueNet1PmultikernelFlattenned
     else:
         model_cls = BlockBlastValueNet1P
     agent = DVNAgent1P(policy_net=model_cls, device=device)
@@ -80,72 +80,6 @@ def load_dvn_agent(checkpoint_path: Path, device: str) -> DVNAgent1P:
     agent.policy_net.eval()
     agent.target_net.eval()
     return agent
-
-
-# ---------------------------------------------------------------------------
-# DVN 3P planner — plans the entire 3-piece round at once
-# ---------------------------------------------------------------------------
-
-class RoundPlanner3P:
-    """
-    At the start of each round (3 new pieces), enumerates all possible 3-step
-    sequences via env.get_t_plus_3_candidates(), scores each terminal board
-    with the value network, and queues the best action sequence.
-    """
-
-    def __init__(self, gamma: float, agent: DVNAgent1P) -> None:
-        self.gamma = gamma
-        self.agent = agent
-        self.plan_actions: list[int] = []
-
-    def reset_round_plan(self) -> None:
-        self.plan_actions = []
-
-    def _build_new_round_plan(self, env: BlockBlast3PEnv) -> list[int] | None:
-        candidates = env.get_t_plus_3_candidates(self.gamma)
-
-        if not candidates:
-            # Fallback: pick any single valid action at random
-            valid_actions = np.flatnonzero(env.valid_placements.reshape(-1))
-            if valid_actions.size == 0:
-                return None
-            return [int(np.random.choice(valid_actions))]
-
-        boards = np.stack([c["state_t_plus_3"] for c in candidates]).astype(np.float32)
-        cum3 = np.array([c["cumulative_reward_3steps"] for c in candidates], dtype=np.float32)
-
-        with torch.no_grad():
-            x = torch.from_numpy(boards).to(self.agent.device)
-            v = self.agent.policy_net(x).squeeze(-1).detach().cpu().numpy().astype(np.float32)
-
-        scores = cum3 + (self.gamma ** 3) * v
-        best = int(np.argmax(scores))
-
-        return [
-            int(p * env.grid_size * env.grid_size + r * env.grid_size + c)
-            for (p, r, c) in candidates[best]["actions"]
-        ]
-
-    def select_action(self, env: BlockBlast3PEnv) -> int | None:
-        if not self.plan_actions:
-            plan = self._build_new_round_plan(env)
-            if plan is None:
-                return None
-            self.plan_actions = plan
-
-        action = self.plan_actions.pop(0)
-
-        # Safety: if the pre-planned action became invalid (rare desync), rebuild
-        if not env.valid_placements.reshape(-1)[action]:
-            self.plan_actions = []
-            plan = self._build_new_round_plan(env)
-            if plan is None:
-                return None
-            self.plan_actions = plan
-            action = self.plan_actions.pop(0)
-
-        return action
-
 
 # ---------------------------------------------------------------------------
 # Baselines
