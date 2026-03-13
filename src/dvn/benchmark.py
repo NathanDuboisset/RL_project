@@ -14,7 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.blockblast.block_blast_env import BlockBlastEnv
 from src.dvn.agent import DVNAgent1P
-from src.dvn.models import BlockBlastValueNet1Pmultikernel
+from src.dvn.models import BlockBlastValueNet1PmultikernelFlattenned
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_dvn_agent(checkpoint_path: Path, device: str) -> DVNAgent1P:
-    agent = DVNAgent1P(policy_net=BlockBlastValueNet1Pmultikernel, device=device)
+    agent = DVNAgent1P(policy_net=BlockBlastValueNet1PmultikernelFlattenned, device=device)
     checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
     agent.policy_net.load_state_dict(checkpoint["policy_state_dict"])
     agent.target_net.load_state_dict(checkpoint["target_state_dict"])
