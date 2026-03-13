@@ -237,7 +237,7 @@ The role of each branch family:
     \item $1\times8$, $8\times1$: full-row and full-column detectors---crucial for identifying nearly-complete lines.
 \end{itemize}
 
-\subsubsection{MLP Head}
+The output of the convolutional branches is fed into a 3-layer MLP head:
 
 \[
 \text{Linear}(64 \to 64) \to \text{LeakyReLU} \to \text{Linear}(64 \to 16) \to \text{LeakyReLU} \to \text{Linear}(16 \to 1)
@@ -246,6 +246,8 @@ The role of each branch family:
 Total parameters: \textbf{42\,461} ($63\times$ fewer than DDQN/Rainbow).
 
 \subsection{Training}
+
+\subsubsection{Principle}
 
 The DVN is trained via temporal difference learning on afterstates. Let $s'_t$ be the chosen afterstate at time $t$.
 
@@ -269,24 +271,44 @@ y_t = \frac{p_{\text{invalid}}}{\gamma}
     \item Checkpoints every 500 episodes with full training state; logging via Weights \& Biases.
 \end{itemize}
 
-\subsection{3P Planner}
+\subsubsection{Dynamics}
 
-For the 3P variant, a \texttt{RoundPlanner3P} wraps the DVN. At each new round it calls \texttt{get\_t\_plus\_3\_candidates($\gamma$)}, scores each candidate:
-\[
-\text{score} = R_{t+1:t+3} + \gamma^3 \cdot V_\theta(s_{t+3})
-\]
-and executes the best 3-action sequence, replanning if an action becomes invalid.
+Figure~\ref{fig:training_metrics} illustrates the evolution of the accumulated reward, temporal difference loss, and episode length over the training process.
 
-\subsection{Results}
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\textwidth]{../plots/wandb_reward.png}
+        \caption{Reward vs. Episode}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\textwidth]{../plots/wandb_loss.png}
+        \caption{Loss vs. Episode}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\textwidth]{../plots/wandb_eplen.png}
+        \caption{Length vs. Episode}
+    \end{subfigure}
+    \caption{Training metrics recorded on Weights \& Biases for the 1P DVN.}
+    \label{fig:training_metrics}
+\end{figure}
+
+Due to the $\varepsilon$-greedy schedule, the agent relies heavily on random exploration during the early phase of training. During the first $\sim$3\,000 episodes, performance remains relatively low and highly stochastic. The loss initially rises as the replay buffer gathers high-reward transitions (from lines being cleared) and starts bootstrapping higher value targets. As the exploration rate decays and the DVN refines its afterstate evaluations, both the episode length and total reward steadily climb. The metrics demonstrate clear learning progress, reaching convergence at around 10\,000 episodes.
+
+\subsection{Results 1P}
 
 Figure~\ref{fig:benchmark} shows the episode return and length distributions for the trained DVN, a greedy baseline, and a random baseline.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\textwidth]{../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png}
-    \caption{Distribution of episode returns (left) and episode lengths (right) for DVN, greedy, and random agents on the 1P Block Blast environment (200 evaluation episodes).}
+    \includegraphics[width=0.95\textwidth]{../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png}
+    \caption{Distribution of episode returns (left) and episode lengths (right) for DVN, greedy, and random agents on the 1P Block Blast environment.}
     \label{fig:benchmark}
 \end{figure}
+
+The trained DVN manages to play very good games (reaching around 300 steps in the best cases), giving it a high mean score. However, it exhibits a high variance with a median that is significantly lower than the mean. This is primarily due to the highly stochastic nature of the environment, which inevitably leads to a large number of poorly performing "bad" games.
 
 \begin{table}[H]
 \centering
@@ -308,6 +330,16 @@ Rainbow 1P            & ---          & $\sim$20     & 2\,674\,464 \\
 
 The trained DVN achieves $\sim$60 average steps per episode vs.\ $\sim$20 for an untrained model. The greedy baseline (always pick highest immediate reward) is shortsighted and over-fills the board; the DVN outperforms it by learning to preserve board space.
 
+\subsection{Results 3P}
+
+For the 3P variant, a \texttt{RoundPlanner3P} wraps the DVN. At each new round it calls \texttt{get\_t\_plus\_3\_candidates($\gamma$)}, scores each candidate by computing the immediate discounted rewards plus the discounted value:
+\[
+\text{score} = r_{t+1} + \gamma r_{t+2} + \gamma^2 r_{t+3} + \gamma^3 \cdot V_\theta(s_{t+3})
+\]
+and executes the best 3-action sequence, replanning if an action becomes invalid.
+
+% TODO: Add results for 3P
+
 %=============================================================================
 \section{Discussion and Future Work}
 
@@ -318,6 +350,7 @@ The DVN decouples \emph{what the board looks like after the move} from \emph{whi
 \begin{itemize}
     \item The value function sees only the afterstate board, \emph{not} upcoming pieces.
     \item The 3P planner's full enumeration is $O(3!\times64^3)$ in the worst case---slow without batched GPU acceleration.
+    \item The environment's piece generation is purely random and thus highly stochastic, unlike the real game which employs logic to avoid giving overly impossible sequences (e.g., three $3\times3$ blocks consecutively). This means our environment is unnecessarily harsh on the agent, whose actual performance on the real game might be significantly better.
 \end{itemize}
 
 \paragraph{Future directions.}
@@ -331,7 +364,7 @@ The DVN decouples \emph{what the board looks like after the move} from \emph{whi
 %=============================================================================
 \section{Conclusion}
 
-We have presented a reinforcement learning study of Block Blast. Standard DQN approaches (DDQN, Rainbow, $\sim$2.67M parameters) struggled to converge within the training budget. A Deep Value Network operating on afterstates---with only 42\,461 parameters and a multi-kernel CNN architecture---achieved substantially better episode lengths and generalised to a three-piece planning setting. The key insight is that leveraging environment structure (precomputed afterstates) reduces the learning problem to simpler value estimation, making training significantly more sample-efficient.
+We have presented a reinforcement learning study of Block Blast. Standard DQN approaches (DDQN, Rainbow, $\sim$2.67M parameters) struggled to converge within the training budget. A Deep Value Network operating on afterstates---with only 42\,461 parameters and a multi-kernel CNN architecture---achieved substantially better performance. The main advantage of the DVN approach is that it does not need to learn the basic mechanics and geometry of the game, since these are handled implicitly by the afterstate generation. However, its true limitation remains the high variance across episodes. Ultimately, what truly allowed the agent to progress from an average of $\sim$30 steps to $\sim$60 steps was the proper design and tuning of the reward shaping.
 
 \newpage
 \appendix

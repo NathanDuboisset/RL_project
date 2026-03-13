@@ -1,0 +1,34 @@
+\babel@toc {english}{}\relax 
+\contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
+\contentsline {section}{\numberline {2}Environment}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Game Rules}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Single-Piece Variant (1P)}{4}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Three-Piece Variant (3P)}{4}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Reward Shaping}{4}{subsection.2.4}%
+\contentsline {subsubsection}{\numberline {2.4.1}Initial Quadratic Reward (Abandoned)}{5}{subsubsection.2.4.1}%
+\contentsline {subsubsection}{\numberline {2.4.2}Final Reward Function (1P)}{5}{subsubsection.2.4.2}%
+\contentsline {subsubsection}{\numberline {2.4.3}Final Reward Function (3P)}{5}{subsubsection.2.4.3}%
+\contentsline {section}{\numberline {3}DQN-Based Approaches}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Architecture}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Double DQN (DDQN)}{6}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Rainbow DQN}{6}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Limitations}{6}{subsection.3.4}%
+\contentsline {section}{\numberline {4}Deep Value Network (DVN)}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Afterstate Formulation}{7}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Architecture: Multi-Kernel CNN}{7}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Training}{8}{subsection.4.3}%
+\contentsline {subsubsection}{\numberline {4.3.1}Principle}{8}{subsubsection.4.3.1}%
+\contentsline {paragraph}{TD Target.}{8}{paragraph*.1}%
+\contentsline {paragraph}{Loss.}{8}{paragraph*.2}%
+\contentsline {paragraph}{Protocol.}{8}{paragraph*.3}%
+\contentsline {subsubsection}{\numberline {4.3.2}Dynamics}{8}{subsubsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.4}Results 1P}{9}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Results 3P}{10}{subsection.4.5}%
+\contentsline {section}{\numberline {5}Discussion and Future Work}{10}{section.5}%
+\contentsline {paragraph}{Why DVN outperforms DQN.}{10}{paragraph*.7}%
+\contentsline {paragraph}{Limitations.}{10}{paragraph*.8}%
+\contentsline {paragraph}{Future directions.}{10}{paragraph*.9}%
+\contentsline {section}{\numberline {6}Conclusion}{10}{section.6}%
+\contentsline {section}{\numberline {A}Model Architectures}{12}{appendix.A}%
+\contentsline {subsection}{\numberline {A.1}BlockBlastCNNNet1P (DDQN / Rainbow)}{12}{subsection.A.1}%
+\contentsline {subsection}{\numberline {A.2}BlockBlastValueNet1PmultikernelFlattenned (DVN)}{12}{subsection.A.2}%
