@@ -181,20 +181,11 @@ class RoundPlanner3P:
     with the value network, and queues the best action sequence.
     """
 
-    def __init__(
-        self,
-        gamma: float,
-        agent: DVNAgent1P,
-        eval_batch_size: int = 4096,
-        beam_width_1: int | None = 48,
-        beam_width_2: int | None = 24,
-    ) -> None:
+    def __init__(self, gamma: float, agent: DVNAgent1P, eval_batch_size: int = 4096) -> None:
         self.gamma = gamma
         self.agent = agent
         self.plan_actions: list[int] = []
         self.eval_batch_size = max(1, int(eval_batch_size))
-        self.beam_width_1 = beam_width_1
-        self.beam_width_2 = beam_width_2
 
     def reset_round_plan(self) -> None:
         self.plan_actions = []
@@ -212,13 +203,6 @@ class RoundPlanner3P:
     @staticmethod
     def _encode_action(env: BlockBlast3PEnv, piece_idx: int, row: int, col: int) -> int:
         return int(piece_idx * env.grid_size * env.grid_size + row * env.grid_size + col)
-
-    @staticmethod
-    def _prune_top_k[T](items: list[T], scores: np.ndarray, k: int | None) -> list[T]:
-        if k is None or k <= 0 or len(items) <= k:
-            return items
-        keep_idx = np.argpartition(scores, -k)[-k:]
-        return [items[int(i)] for i in keep_idx.tolist()]
 
     def _build_new_round_plan(self, env: BlockBlast3PEnv) -> list[int] | None:
         # Fast path: stream 3-step candidates and evaluate in batches to avoid
@@ -291,47 +275,36 @@ class RoundPlanner3P:
             batch_actions.clear()
 
         for p0, p1, p2 in itertools.permutations(available, 3):
-            level1: list[tuple[float, np.ndarray, int, tuple[tuple[int, int, int]]]] = []
-
             valid0 = env._valid_positions_for_piece_on_board(board0, p0)
             rows0, cols0 = np.nonzero(valid0)
+
             for r0, c0 in zip(rows0.tolist(), cols0.tolist()):
                 board1, r_t, combo1 = env._simulate_one_hyp_step(board0, combo0, p0, r0, c0)
-                level1.append((float(r_t), board1, combo1, ((p0, r0, c0),)))
 
-            if not level1:
-                continue
-
-            if self.beam_width_1 is not None and len(level1) > self.beam_width_1:
-                level1_scores = np.fromiter((x[0] for x in level1), dtype=np.float32, count=len(level1))
-                level1 = self._prune_top_k(level1, level1_scores, self.beam_width_1)
-
-            level2: list[tuple[float, np.ndarray, int, tuple[tuple[int, int, int], tuple[int, int, int]]]] = []
-            for cum1, board1, combo1, a1 in level1:
                 valid1 = env._valid_positions_for_piece_on_board(board1, p1)
                 rows1, cols1 = np.nonzero(valid1)
+                if rows1.size == 0:
+                    continue
+
                 for r1, c1 in zip(rows1.tolist(), cols1.tolist()):
                     board2, r_t1, combo2 = env._simulate_one_hyp_step(board1, combo1, p1, r1, c1)
-                    level2.append((cum1 + self.gamma * float(r_t1), board2, combo2, (a1[0], (p1, r1, c1))))
 
-            if not level2:
-                continue
+                    valid2 = env._valid_positions_for_piece_on_board(board2, p2)
+                    rows2, cols2 = np.nonzero(valid2)
+                    if rows2.size == 0:
+                        continue
 
-            if self.beam_width_2 is not None and len(level2) > self.beam_width_2:
-                level2_scores = np.fromiter((x[0] for x in level2), dtype=np.float32, count=len(level2))
-                level2 = self._prune_top_k(level2, level2_scores, self.beam_width_2)
+                    cum2 = float(r_t + self.gamma * r_t1)
+                    a01 = ((p0, r0, c0), (p1, r1, c1))
 
-            for cum2, board2, combo2, a2 in level2:
-                valid2 = env._valid_positions_for_piece_on_board(board2, p2)
-                rows2, cols2 = np.nonzero(valid2)
-                for r2, c2 in zip(rows2.tolist(), cols2.tolist()):
-                    board3, r_t2, _ = env._simulate_one_hyp_step(board2, combo2, p2, r2, c2)
-                    batch_boards.append(board3)
-                    batch_cum3.append(cum2 + gamma2 * float(r_t2))
-                    batch_actions.append((a2[0], a2[1], (p2, r2, c2)))
+                    for r2, c2 in zip(rows2.tolist(), cols2.tolist()):
+                        board3, r_t2, _ = env._simulate_one_hyp_step(board2, combo2, p2, r2, c2)
+                        batch_boards.append(board3)
+                        batch_cum3.append(cum2 + gamma2 * float(r_t2))
+                        batch_actions.append((a01[0], a01[1], (p2, r2, c2)))
 
-                    if len(batch_boards) >= self.eval_batch_size:
-                        flush_batch()
+                        if len(batch_boards) >= self.eval_batch_size:
+                            flush_batch()
 
         flush_batch()
 
