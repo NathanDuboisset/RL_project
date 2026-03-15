@@ -338,14 +338,122 @@ For the 3P variant, a \texttt{RoundPlanner3P} wraps the DVN. At each new round i
 \]
 and executes the best 3-action sequence, replanning if an action becomes invalid.
 
-% TODO: Add results for 3P
+%=============================================================================%
 
+Up to this point, our study has focused on the 1P variant, which significantly simplifies the action space. The core dynamics of \emph{Block Blast}, however, rely on the 3P variant, where three pieces are generated simultaneously and must be placed on the grid to complete a wave. This variant introduces a major combinatorial challenge: the agent is free to choose the order in which the three pieces are played.
+
+\subsubsection{Motivation and Combinatorial Explosion}
+
+Transitioning from 1P to 3P is not merely an increase in the number of pieces, it entails an exponential explosion of the search tree. For a given state with three pieces, there are $3! = 6$ possible placement sequences. Assuming each piece has an average of ten valid positions, evaluating all permutations and positions quickly leads to thousands of potential terminal states for a single wave.
+
+The objective of this section is to verify whether our \textbf{Deep Value Network (DVN)}, initially trained on the 1P variant to evaluate the structural quality of a grid, can be robustly used as a heuristic in a limited-depth search tree (\emph{lookahead}) for the 3P variant.
+
+\subsubsection{Benchmark Methodology}
+
+To quantify the model's performance, we implemented several planning policies and compared them on a rigorous benchmark consisting of 250 episodes  with a discount factor $\gamma = 0.99$. 
+
+As for the 1P setting, the following agents were evaluated:
+\begin{itemize}
+    \item \textbf{Random:} Uniformly selects an action among the legal moves. This approach serves as our lower-bound baseline.
+    \item \textbf{Greedy (Depth-2 \& Depth-3):} A myopic search algorithm that simulates the possibility tree and selects the sequence maximizing the immediate reward (i.e., the score obtained by clearing lines) during the current wave.
+    \item \textbf{DVN (Depth-2 \& Depth-3):} The agent uses our value network to evaluate potential \emph{afterstates}. The optimal sequence of actions $\mathcal{S}^*$ is chosen by maximizing the sum of immediate rewards and the discounted future value of the resulting state:
+    \begin{equation}
+        \mathcal{S}^* = \arg\max_{\mathcal{S}} \left( \sum_{r_t \in \mathcal{S}} \gamma^t r_t + \gamma^k V_{\theta}(s_{\text{final}}) \right)
+    \end{equation}
+    where $V_{\theta}$ is the value predicted by the network and $k$ is the depth of the simulation within the tree.
+\end{itemize}
+
+\subsubsection{Results and Superiority of the DVN}
+
+The performances of the agents at depth 2 (anticipating the placement of 2 pieces) reveal a striking performance gap. The statistics computed over our main sample of 250 episodes are summarized in the table below:
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lrr}
+        \toprule
+        \textbf{Policy} & \textbf{Mean Reward (Score)} & \textbf{Mean Length (Steps)} \\
+        \midrule
+        DVN depth-2 & \textbf{23\,412.72} & \textbf{209.29} \\
+        DVN depth-3 & \textbf{47\,469.39} & \textbf{ 223.72} \\
+        Greedy depth-2 & 1\,884.90 & 44.45 \\
+        Random & 25.33 & 11.93 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Performance comparison of the agents on the 3P variant (250 episodes, $\gamma=0.99$).}
+    \label{tab:benchmark_3p_main}
+\end{table}
+
+Several decisive conclusions emerge from these results:
+
+\begin{enumerate}
+    \item \textbf{The Failure of the Greedy Approach:} The \emph{Greedy} agent demonstrates that pure short-term reward maximization is deeply suboptimal for \emph{Block Blast}. By focusing entirely on immediate line clears to score points, the \emph{Greedy} policy tends to fragment the free space on the grid. This rapidly makes the board unplayable, leading to premature game overs at around 44 steps on average.
+    
+    \item \textbf{The Geometric Understanding of the DVN:} Conversely, the DVN depth-2 agent survives nearly five times longer ($\sim$209 steps) and achieves a massive average score of over 23,400 points. This proves that the network successfully captured the "intrinsic value" of a board. It is capable of sacrificing immediate rewards (e.g., delaying a line clear) if it identifies that doing so preserves a healthier grid topology, thereby mitigating the risk of a game over.
+    
+    \item \textbf{Impact of Higher Depth (Depth-3):} Expanding the evaluation to depth 3 allows the agent to anticipate the entire wave. Although significantly more computationally expensive due to the massive number of states evaluated in batches by the network, this increased depth should enable the agent to avoid geometric dead ends that only become apparent when placing the third piece of the draw. In practice, we observed significantly higher rewards with this increased depth (the rewards doubled) whereas the length of the episodes remained about the same (which may be due to the small number of episodes used for evaluation at depth 3, due to the computation cost of this policy). 
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+        \includegraphics[width=0.9\textwidth]{../plots/benchmark_3p_d2_unclipped.png}
+        \caption{Performance of the DVN for a depth 2 look ahead}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+        \includegraphics[width=0.9\textwidth]{../plots/benchmark_3p_d3_unclipped.png}
+        \caption{Performance of the DVN for a depth 3 look ahead}
+\end{figure}
+
+\subsubsection{Computational Bottlenecks and Limitations}
+
+While the \emph{Deep Value Network} proves extremely effective at navigating this large combinatorial space, its exhaustive application quickly becomes a computational bottleneck. Performing inference on all \emph{leaf boards} at depth 3 requires evaluating very large tensors by batch on the GPU and limiting ourselves to the much more reasonable depth of 2 for the lookahead might be interesting. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../plots/benchmark_3p_d2_vs_d3_unclipped.png}
+    \caption{Performance comparison according to the depth of the lookahead}
+\end{figure}
+
+
+
+%=============================================================================
+\section{Proximal Policy Optimization (PPO)}
+\subsection{Principle}
+Instead of learning a value function over states, PPO directly learns a stochastic policy $\pi_\theta(a|s)$ that maps the current board state and available pieces to a probability distribution over valid placements. The observation is encoded through three specialized modules: a BoardEncoder that processes the binary $8\times8$ grid through a convolutional stack into a 128-d feature vector, a PiecesEncoder that encodes the three $5\times5$  padded pieces as a 3-channel input into a 64-d vector, and a ScalarEncoder that maps the combo counter and piece usage flags into a 32-d vector.These representations are concatenated into a 224-d joint embedding and passed through a shared MLP trunk producing a 256-d feature vector, from which a policy head and a value head are derived.
+The policy is updated by maximizing a clipped surrogate objective:
+$$L^{CLIP}(\theta)=\mathbb{E}_t[min(r_t(\theta)\hat{A}^t,clip(r_t(\theta),1-\epsilon,1+\epsilon)\hat{A}^t)]$$
+where $r_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}$ 
+is the probability ratio and $\hat{A}_t$ is the advantage estimate computed via GAE using the value head $V_\phi(s)$ trained alongside the policy. The policy head produces logits over the 192 possible placements (3 pieces $\times$ 64 positions), with invalid placements masked to $-\infty$ prior to sampling. During training, actions are sampled stochastically from the resulting distribution; during evaluation, the policy acts greedily by taking the argmax of the masked logits. The advantage of PPO over DVN is that it does not require enumerating all valid afterstates at each step, making it more scalable to the large action space of Block Blast.
+
+\subsection{Arborescent search upgrade}
+To enhance PPO that makes its decisions by a stochastic sampling, we use Monte Carlo Tree Search to have an exhaustive planning of depth 3 in the environment with 3 pieces - it is a loosely inspired from AlphaZero but adapted for Block Blast. The key idea is that the environment is deterministic at each round, it is therefore possible to enumerate all possible placements and to choose the best one, guided by the value network from PPO.
+
+At the beginning of each round (3 pieces to place), all authorized sequences of 3 placements are calculated and scored as the weighted sum of the cumulated reward over the last 3 placements and the value of the terminal state estimated by PPO's value network. The agent then plays the first action of the best sequence, and to continue the round, PPO is simply used in a deterministic manner (with the argmax of the logits). With this upgrade, the mean length of the episodes increases from 25.2 to 36.7, which is a substantial upgrade.
+
+We also tried a more deterministic approach, which turned out to be the most successful: at the beginning of each round, we enumerate all possible 3-placement sequences via \texttt{env.get\_t\_plus\_3\_candidates()} and score each terminal state \texttt{S(t+3)} with the formula: 
+\[
+\text{score} = symlog(r_{t+1} + \gamma r_{t+2} + \gamma^2 r_{t+3}) + \alpha \cdot symlog(V_\theta(s_{t+3}))
+\]
+Both terms are kept in symlog space for comparable scales, and because some runs showed that this value could be explosive. The parameter $\alpha$ is a value weight hyperparameter that controls the relative influence of the PPO value network on the score. Hence $\alpha =0$ means that the agent completely ignores the value network and the model is totally deterministic. Once the best-scoring sequence is identified, all three actions are stored in a queue and executed in order without re-searching at steps 2 and 3. Furthermore, for the sake of efficiency, the value network inference is batched: all candidate terminal boards are stacked into a single tensor and processed in chunks of 512 through the PPO \texttt{ActorCritic} network, making the scoring step GPU-efficient despite the potentially large number of candidates.
+
+To determine the optimal $\alpha$ value and to see if there exists a balance between the deterministic and stochastic aspects of this approach, we conducted a sweep over several values, evaluating each configuration over 50 episodes and measuring several metrics.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\textwidth]{../plots/value_weight_sweep.png}
+    \caption{Mean return, median return and mean episode length for different values of alpha}
+    \label{fig:weightsweep}
+\end{figure}
+
+We observed in practice that the score of the PPO value network is an order of magnitude higher than the score given by the exploration of terminal states. On the figure above, we can note the best results are obtained with $\alpha \in [0.1, 0.5]$, confirming the fact that this problem cannot be simply treated with a brute force approach. We can furthermore note that for such values, the mean length of an episode is around 550, which is the highest score we achieved. However, the research of the terminal state is computationally expensive and take on average approximately 1100 ms per 3-step sequence.
 %=============================================================================
 \section{Discussion and Future Work}
 
 \paragraph{Why DVN outperforms DQN.}
 The DVN decouples \emph{what the board looks like after the move} from \emph{which action achieves it}. The value network only needs to learn a board-to-value mapping---far simpler than the full Q-function which also encodes piece geometry and placement logic.
-
+\paragraph{Why PPO outperforms DVN.}
+While DVN learns a value function solely over afterstates - i.e. the resulting board configuration after a single placement, independently of the remaining pieces or the current position within the round - PPO conditions its value estimate on the full observation: the current board, the three available pieces, the piece usage flags \texttt{pieces\_used}, and the combo counter. This richer conditioning is particularly beneficial in the context of tree search: when scoring a terminal state $s_{t+3}$, the PPO value network $V_\phi(s_{t+3})$ has access to the complete context of the position, whereas a DVN-based scorer evaluates the resulting board in isolation. As a result, the value network from PPO provides a more informed heuristic for guiding the search.
 \paragraph{Limitations.}
 \begin{itemize}
     \item The value function sees only the afterstate board, \emph{not} upcoming pieces.
