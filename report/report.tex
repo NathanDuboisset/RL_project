@@ -341,11 +341,42 @@ and executes the best 3-action sequence, replanning if an action becomes invalid
 % TODO: Add results for 3P
 
 %=============================================================================
+\section{Proximal Policy Optimization (PPO)}
+\subsection{Principle}
+Instead of learning a value function over states, PPO directly learns a stochastic policy $\pi_\theta(a|s)$ that maps the current board state and available pieces to a probability distribution over valid placements. The observation is encoded through three specialized modules: a BoardEncoder that processes the binary $8\times8$ grid through a convolutional stack into a 128-d feature vector, a PiecesEncoder that encodes the three $5\times5$  padded pieces as a 3-channel input into a 64-d vector, and a ScalarEncoder that maps the combo counter and piece usage flags into a 32-d vector.These representations are concatenated into a 224-d joint embedding and passed through a shared MLP trunk producing a 256-d feature vector, from which a policy head and a value head are derived.
+The policy is updated by maximizing a clipped surrogate objective:
+$$L^{CLIP}(\theta)=\mathbb{E}_t[min(r_t(\theta)\hat{A}^t,clip(r_t(\theta),1-\epsilon,1+\epsilon)\hat{A}^t)]$$
+where $r_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}$ 
+is the probability ratio and $\hat{A}_t$ is the advantage estimate computed via GAE using the value head $V_\phi(s)$ trained alongside the policy. The policy head produces logits over the 192 possible placements (3 pieces $\times$ 64 positions), with invalid placements masked to $-\infty$ prior to sampling. During training, actions are sampled stochastically from the resulting distribution; during evaluation, the policy acts greedily by taking the argmax of the masked logits. The advantage of PPO over DVN is that it does not require enumerating all valid afterstates at each step, making it more scalable to the large action space of Block Blast.
+
+\subsection{Arborescent search upgrade}
+To enhance PPO that makes its decisions by a stochastic sampling, we use Monte Carlo Tree Search to have an exhaustive planning of depth 3 in the environment with 3 pieces - it is a loosely inspired from AlphaZero but adapted for Block Blast. The key idea is that the environment is deterministic at each round, it is therefore possible to enumerate all possible placements and to choose the best one, guided by the value network from PPO.
+
+At the beginning of each round (3 pieces to place), all authorized sequences of 3 placements are calculated and scored as the weighted sum of the cumulated reward over the last 3 placements and the value of the terminal state estimated by PPO's value network. The agent then plays the first action of the best sequence, and to continue the round, PPO is simply used in a deterministic manner (with the argmax of the logits). With this upgrade, the mean length of the episodes increases from 25.2 to 36.7, which is a substantial upgrade.
+
+We also tried a more deterministic approach, which turned out to be the most successful: at the beginning of each round, we enumerate all possible 3-placement sequences via \texttt{env.get\_t\_plus\_3\_candidates()} and score each terminal state \texttt{S(t+3)} with the formula: 
+\[
+\text{score} = symlog(r_{t+1} + \gamma r_{t+2} + \gamma^2 r_{t+3}) + \alpha \cdot symlog(V_\theta(s_{t+3}))
+\]
+Both terms are kept in symlog space for comparable scales, and because some runs showed that this value could be explosive. The parameter $\alpha$ is a value weight hyperparameter that controls the relative influence of the PPO value network on the score. Hence $\alpha =0$ means that the agent completely ignores the value network and the model is totally deterministic. Once the best-scoring sequence is identified, all three actions are stored in a queue and executed in order without re-searching at steps 2 and 3. Furthermore, for the sake of efficiency, the value network inference is batched: all candidate terminal boards are stacked into a single tensor and processed in chunks of 512 through the PPO \texttt{ActorCritic} network, making the scoring step GPU-efficient despite the potentially large number of candidates.
+
+To determine the optimal $\alpha$ value and to see if there exists a balance between the deterministic and stochastic aspects of this approach, we conducted a sweep over several values, evaluating each configuration over 50 episodes and measuring several metrics.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\textwidth]{../plots/value_weight_sweep.png}
+    \caption{Mean return, median return and mean episode length for different values of alpha}
+    \label{fig:weightsweep}
+\end{figure}
+
+We observed in practice that the score of the PPO value network is an order of magnitude higher than the score given by the exploration of terminal states. On the figure above, we can note the best results are obtained with $\alpha \in [0.1, 0.5]$, confirming the fact that this problem cannot be simply treated with a brute force approach. We can furthermore note that for such values, the mean length of an episode is around 550, which is the highest score we achieved. However, the research of the terminal state is computationally expensive and take on average approximately 1100 ms per 3-step sequence.
+%=============================================================================
 \section{Discussion and Future Work}
 
 \paragraph{Why DVN outperforms DQN.}
 The DVN decouples \emph{what the board looks like after the move} from \emph{which action achieves it}. The value network only needs to learn a board-to-value mapping---far simpler than the full Q-function which also encodes piece geometry and placement logic.
-
+\paragraph{Why PPO outperforms DVN.}
+While DVN learns a value function solely over afterstates - i.e. the resulting board configuration after a single placement, independently of the remaining pieces or the current position within the round - PPO conditions its value estimate on the full observation: the current board, the three available pieces, the piece usage flags \texttt{pieces\_used}, and the combo counter. This richer conditioning is particularly beneficial in the context of tree search: when scoring a terminal state $s_{t+3}$, the PPO value network $V_\phi(s_{t+3})$ has access to the complete context of the position, whereas a DVN-based scorer evaluates the resulting board in isolation. As a result, the value network from PPO provides a more informed heuristic for guiding the search.
 \paragraph{Limitations.}
 \begin{itemize}
     \item The value function sees only the afterstate board, \emph{not} upcoming pieces.
