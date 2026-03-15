@@ -1,7 +1,21 @@
 \relax 
-\providecommand \babel@aux [2]{\global \let \babel@toc \@gobbletwo }
-\@nameuse{bbl@beforestart}
 \providecommand\hyper@newdestlabel[2]{}
+\providecommand\babel@aux[2]{}
+\@nameuse{bbl@beforestart}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
 \babel@aux{english}{}
@@ -40,12 +54,18 @@
 \@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Agent performance summary on the 1P environment.\relax }}{9}{table.caption.6}\protected@file@percent }
 \newlabel{tab:results}{{1}{9}{Agent performance summary on the 1P environment.\relax }{table.caption.6}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Results 3P}{10}{subsection.4.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion and Future Work}{10}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Why DVN outperforms DQN.}{10}{paragraph*.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Limitations.}{10}{paragraph*.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Future directions.}{10}{paragraph*.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{10}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A}Model Architectures}{12}{appendix.A}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}BlockBlastCNNNet1P (DDQN / Rainbow)}{12}{subsection.A.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}BlockBlastValueNet1PmultikernelFlattenned (DVN)}{12}{subsection.A.2}\protected@file@percent }
-\gdef \@abspage@last{12}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Proximal Policy Optimization (PPO)}{10}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Principle}{10}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Arborescent search upgrade}{10}{subsection.5.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Mean return, median return and mean episode length for different values of alpha\relax }}{11}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:weightsweep}{{3}{11}{Mean return, median return and mean episode length for different values of alpha\relax }{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion and Future Work}{12}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why DVN outperforms DQN.}{12}{paragraph*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why PPO outperforms DVN.}{12}{paragraph*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Limitations.}{12}{paragraph*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Future directions.}{12}{paragraph*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{12}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A}Model Architectures}{14}{appendix.A}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}BlockBlastCNNNet1P (DDQN / Rainbow)}{14}{subsection.A.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}BlockBlastValueNet1PmultikernelFlattenned (DVN)}{14}{subsection.A.2}\protected@file@percent }
+\gdef \@abspage@last{14}
