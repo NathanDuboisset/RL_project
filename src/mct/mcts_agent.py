@@ -86,12 +86,32 @@ class MCTSAgent:
         gamma: float = 0.99,
         batch_size: int = 512,
         verbose: bool = False,
+        value_weight: float = 0.0,
     ):
-        self.model      = model
-        self.device     = device
-        self.gamma      = gamma
-        self.batch_size = batch_size
-        self.verbose    = verbose
+        """
+        value_weight : weight on the value network term in the scoring formula.
+
+        Formula (all in symlog space for comparable scales):
+            score = symlog(rewards_3_coups) + value_weight * V_symlog(S(t+3))
+
+        OdG calibration (from dataset analysis):
+            symlog(rewards_3_coups) : 0.26 -> 6.34  (mean ~3.9)
+            V_symlog                : ~14.18          (always above reward range)
+
+        Recommended values to sweep:
+            0.0  -> pure reward, value ignored   (baseline)
+            0.05 -> light value guidance
+            0.1  -> balanced
+            0.3  -> value starts to dominate
+            0.5  -> value dominates
+            1.0  -> value crushes rewards        (original behaviour)
+        """
+        self.model        = model
+        self.device       = device
+        self.gamma        = gamma
+        self.batch_size   = batch_size
+        self.verbose      = verbose
+        self.value_weight = value_weight
 
         self.model.eval()
 
@@ -138,6 +158,36 @@ class MCTSAgent:
         # invert symlog -> raw value scale
         return symexp(values)
 
+    @torch.no_grad()
+    def _value_batch_raw(
+        self,
+        boards: np.ndarray,
+        pieces_padded: np.ndarray,
+        pieces_used: np.ndarray,
+        combo: int,
+    ) -> np.ndarray:
+        """Same as _value_batch but returns raw symlog predictions (no symexp).
+        Used when scoring in symlog space for scale-compatible mixing with rewards."""
+        N = boards.shape[0]
+        values = np.zeros(N, dtype=np.float32)
+
+        pieces_tiled = np.tile(pieces_padded[None], (N, 1, 1, 1))
+        used_tiled   = np.tile(pieces_used[None],   (N, 1))
+        combo_arr    = np.full((N, 1), combo, dtype=np.float32)
+
+        for start in range(0, N, self.batch_size):
+            end   = min(start + self.batch_size, N)
+            obs_b = {
+                "board":       torch.as_tensor(boards[start:end],       device=self.device),
+                "pieces":      torch.as_tensor(pieces_tiled[start:end], device=self.device),
+                "pieces_used": torch.as_tensor(used_tiled[start:end],   device=self.device),
+                "combo":       torch.as_tensor(combo_arr[start:end],    device=self.device),
+            }
+            _, v = self.model.forward(obs_b)
+            values[start:end] = v.cpu().numpy()
+
+        return values   # symlog space, ~14 for this model
+
     # -------------------------------------------------------------------------
     # Core: score all candidates for the current round
     # -------------------------------------------------------------------------
@@ -146,11 +196,19 @@ class MCTSAgent:
         """
         Call env.get_t_plus_3_candidates() and score every terminal state.
 
-        Returns the list of candidates sorted by score descending, each with
-        an added 'score' key.
-        """
-        gamma3 = self.gamma ** 3
+        Scoring formula (symlog space for comparable scales):
+            score = symlog(rewards_3_coups) + value_weight * V_symlog(S(t+3))
 
+        Both terms are in symlog space:
+            symlog(rewards) : 0.26 -> 6.34
+            V_symlog        : ~14  (biased high but relatively consistent)
+
+        value_weight=0.0 -> pure reward ranking (ignores value network)
+        value_weight=0.1 -> balanced mix
+        value_weight=1.0 -> value dominates
+
+        Returns the list of candidates sorted by score descending.
+        """
         candidates = env.get_t_plus_3_candidates(self.gamma)
         if not candidates:
             return []
@@ -160,55 +218,76 @@ class MCTSAgent:
             [c["state_t_plus_3"] for c in candidates], axis=0
         ).astype(np.float32)   # (N, 8, 8)
 
-        # After 3 placements the round is over: pieces_used = all ones,
-        # next round pieces are unknown -> use zeros as neutral placeholder.
         pieces_padded = np.zeros((3, 5, 5), dtype=np.float32)
         pieces_used   = np.ones(3,          dtype=np.float32)
-        combo_after   = 0   # combo resets if no clear happened; conservative
+        combo_after   = 0
 
-        values = self._value_batch(boards, pieces_padded, pieces_used, combo_after)
+        # Reward term: symlog of cumulative 3-step reward
+        raw_rewards = np.array(
+            [c["cumulative_reward_3steps"] for c in candidates], dtype=np.float32
+        )
+        from mct.ppo_agent import symlog as _symlog
+        rewards_sl = _symlog(raw_rewards)   # (N,) in symlog space, range ~0.26-6.34
 
-        # Final score: discounted 3-step reward + bootstrapped value
+        # Value term: raw symlog predictions from value network (~14 for this model)
+        if self.value_weight > 0.0:
+            v_raw = self._value_batch_raw(
+                boards, pieces_padded, pieces_used, combo_after
+            )   # (N,) in symlog space
+        else:
+            v_raw = np.zeros(len(candidates), dtype=np.float32)
+
+        # Combined score
         for i, c in enumerate(candidates):
-            c["score"] = c["cumulative_reward_3steps"] + gamma3 * float(values[i])
+            c["score"]          = float(rewards_sl[i] + self.value_weight * v_raw[i])
+            c["reward_term"]    = float(rewards_sl[i])
+            c["value_term"]     = float(v_raw[i])
 
         candidates.sort(key=lambda c: c["score"], reverse=True)
         return candidates
 
     # -------------------------------------------------------------------------
-    # Public: select_action
+    # Public: select_action  (triplet-aware)
     # -------------------------------------------------------------------------
+
+    def select_round(self, env) -> list:
+        """
+        Plan the full round: score all 3-step sequences and return the
+        best triplet as a list of 3 integer actions.
+
+        Should be called ONCE at round start (pieces_used == [0,0,0]).
+        Returns a list of 3 actions to execute in order.
+        """
+        t0 = time.time()
+        candidates = self._score_candidates(env)
+
+        if not candidates:
+            return []
+
+        best = candidates[0]
+        triplet = []
+        for piece_idx, row, col in best["actions"]:
+            action = piece_idx * (env.grid_size * env.grid_size) + row * env.grid_size + col
+            triplet.append(int(action))
+
+        if self.verbose:
+            elapsed = time.time() - t0
+            print(
+                f"[MCTS] {len(candidates)} candidates | "
+                f"best score {best['score']:.2f} "
+                f"(3-step rew {best['cumulative_reward_3steps']:.2f}) | "
+                f"{elapsed*1000:.1f}ms"
+            )
+        return triplet
 
     def select_action(self, env) -> int:
         """
-        Choose the best action for the CURRENT step.
-
-        If candidates are available (full round), picks the first action of
-        the best 3-step sequence.
-        Falls back to a greedy value-based single-step choice if no candidates
-        (e.g. only 1-2 pieces left in the round).
-
-        Returns an integer action in [0, 192).
+        Single-step wrapper kept for backward compatibility.
+        Prefer select_round() for full triplet planning.
         """
-        t0 = time.time()
-
-        candidates = self._score_candidates(env)
-
-        if candidates:
-            best = candidates[0]
-            piece_idx, row, col = best["actions"][0]
-            action = piece_idx * (env.grid_size * env.grid_size) + row * env.grid_size + col
-
-            if self.verbose:
-                n = len(candidates)
-                elapsed = time.time() - t0
-                print(
-                    f"[MCTS] {n} candidates | best score {best['score']:.2f} "
-                    f"(3-step rew {best['cumulative_reward_3steps']:.2f}) | {elapsed*1000:.1f}ms"
-                )
-            return int(action)
-
-        # Fallback: greedy single-step (happens mid-round if called directly)
+        triplet = self.select_round(env)
+        if triplet:
+            return triplet[0]
         return self._greedy_fallback(env)
 
     def _greedy_fallback(self, env) -> int:
@@ -241,6 +320,10 @@ class MCTSAgent:
         """
         Run n_episodes and return aggregate stats.
 
+        Uses triplet-aware planning: MCTS plans all 3 actions at round start
+        and executes them in order without re-searching mid-round.
+        3x fewer MCTS calls vs the original single-action approach.
+
         Parameters
         ----------
         env_fn      : callable with no args that returns a fresh env instance
@@ -258,29 +341,39 @@ class MCTSAgent:
             env = env_fn()
             obs, _ = env.reset()
 
-            total_r   = 0.0
-            n_steps   = 0
-            round_start = time.time()
+            total_r      = 0.0
+            n_steps      = 0
+            action_queue = []   # remaining planned actions for current round
 
             while True:
-                # Detect round boundary: all pieces available -> run full search
-                pieces_used = obs["pieces_used"]
+                if use_mcts:
+                    if not action_queue:
+                        # Round boundary: plan all 3 actions at once
+                        t0 = time.time()
+                        action_queue = self.select_round(env)
+                        round_times.append((time.time() - t0) * 1000)
 
-                if use_mcts and not np.any(pieces_used):
-                    # Start of a new round: score all 3-step sequences
-                    t0     = time.time()
-                    action = self.select_action(env)
-                    round_times.append((time.time() - t0) * 1000)
+                        if not action_queue:
+                            # Fallback if MCTS returns empty
+                            action_queue = [self._greedy_fallback(env)]
+
+                    action = action_queue.pop(0)
                 else:
-                    # Mid-round: just pick the best single step
                     action = self._greedy_fallback(env)
 
                 obs, r, term, trunc, _ = env.step(action)
                 total_r += r
                 n_steps += 1
 
+                # If episode ends mid-round, clear the queue
                 if term or trunc:
+                    action_queue = []
                     break
+
+                # If round ended (all pieces used), clear queue so MCTS
+                # replans fresh for the next round
+                if np.all(obs["pieces_used"] == 0):
+                    action_queue = []
 
             returns.append(total_r)
             lengths.append(n_steps)
