@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.21 (TeX Live 2020) (preloaded format=pdflatex 2025.11.9)  15 MAR 2026 22:46
+This is pdfTeX, Version 3.14159265-2.6-1.40.21 (TeX Live 2020) (preloaded format=pdflatex 2025.11.9)  16 MAR 2026 22:08
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -666,7 +666,7 @@ Package caption Info: float package is loaded.
 Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count319
-<polytechnique-armes.pdf, id=88, 195.20929pt x 257.65259pt>
+<polytechnique-armes.pdf, id=148, 195.20929pt x 257.65259pt>
 File: polytechnique-armes.pdf Graphic file (type pdf)
 <use polytechnique-armes.pdf>
 Package pdftex.def Info: polytechnique-armes.pdf  used on input line 44.
@@ -678,7 +678,7 @@ LaTeX Font Info:    Trying to load font information for T1+lmss on input line 4
 File: t1lmss.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
 LaTeX Info: Redefining \\ on input line 44.
-<polytechnique-filetcourt.pdf, id=89, 28.40613pt x 2.1681pt>
+<polytechnique-filetcourt.pdf, id=149, 28.40613pt x 2.1681pt>
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
 Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 44.
@@ -725,7 +725,7 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 44.
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-<polytechnique-logovert.pdf, id=90, 322.46072pt x 560.54622pt>
+<polytechnique-logovert.pdf, id=150, 322.46072pt x 560.54622pt>
 File: polytechnique-logovert.pdf Graphic file (type pdf)
 <use polytechnique-logovert.pdf>
 Package pdftex.def Info: polytechnique-logovert.pdf  used on input line 44.
@@ -736,31 +736,37 @@ Package pdftex.def Info: polytechnique-logovert.pdf  used on input line 44.
 ique-armes.pdf> <./polytechnique-filetcourt.pdf> <./polytechnique-logovert.pdf>
 ]
 LaTeX Info: Redefining \\ on input line 46.
-<polytechnique-filetlongrouge.pdf, id=128, 124.21407pt x 2.1681pt>
+<polytechnique-filetlongrouge.pdf, id=188, 124.21407pt x 2.1681pt>
 File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
 <use polytechnique-filetlongrouge.pdf>
 Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 4
 6.
 (pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
- (./report.toc)
+ (./report.toc
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <5> on input line 4.
+<polytechnique-logohori.pdf, id=218, 625.50987pt x 227.64648pt>
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 34.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+
+[2
+
+ <./polytechnique-logohori.pdf> <./polytechnique-filetlongrouge.pdf>])
 \tf@toc=\write4
 \openout4 = `report.toc'.
 
-<polytechnique-logohori.pdf, id=129, 625.50987pt x 227.64648pt>
 File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
 Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 47.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
 
-[2
-
- <./polytechnique-logohori.pdf> <./polytechnique-filetlongrouge.pdf>]
+[3]
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <9> on input line 51.
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <6> on input line 51.
-LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <5> on input line 51.
 LaTeX Info: Redefining \\ on input line 55.
 File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
 <use polytechnique-filetlongrouge.pdf>
@@ -769,8 +775,7 @@ Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 5
 (pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
 LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 6
 1.
-
-(/usr/share/texlive/texmf-dist/tex/latex/lm/ts1lmr.fd
+ (/usr/share/texlive/texmf-dist/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
 LaTeX Info: Redefining \\ on input line 70.
@@ -787,7 +792,7 @@ File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
 Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 90.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [3]
+ [4]
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
 Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 94.
@@ -810,7 +815,7 @@ File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
 Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 124.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [4]
+ [5]
 LaTeX Info: Redefining \\ on input line 150.
 File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
 <use polytechnique-filetlongrouge.pdf>
@@ -825,7 +830,7 @@ File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
 Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 163.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [5]
+ [6]
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
 Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 163.
@@ -838,73 +843,79 @@ File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
 Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 184.
 (pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
-LaTeX Info: Redefining \\ on input line 195.
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 194.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+ [7]
+LaTeX Info: Redefining \\ on input line 196.
 File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
 <use polytechnique-filetlongrouge.pdf>
 Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 1
-95.
+96.
 (pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 198.
-(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
-File: polytechnique-logohori.pdf Graphic file (type pdf)
-<use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 201.
-(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [6]
-File: polytechnique-filetcourt.pdf Graphic file (type pdf)
-<use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 206.
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 199.
 (pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 248.
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 207.
 (pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
 File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 250.
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 245.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [7]
-<../plots/wandb_reward.png, id=201, 3806.22pt x 1999.47pt>
+ [8]
+File: polytechnique-filetcourt.pdf Graphic file (type pdf)
+<use polytechnique-filetcourt.pdf>
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 249.
+(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
+<../plots/wandb_reward.png, id=301, 3806.22pt x 1999.47pt>
 File: ../plots/wandb_reward.png Graphic file (type png)
 <use ../plots/wandb_reward.png>
-Package pdftex.def Info: ../plots/wandb_reward.png  used on input line 281.
+Package pdftex.def Info: ../plots/wandb_reward.png  used on input line 282.
 (pdftex.def)             Requested size: 154.78653pt x 81.30759pt.
-<../plots/wandb_loss.png, id=203, 3806.22pt x 1999.47pt>
+<../plots/wandb_loss.png, id=303, 3806.22pt x 1999.47pt>
 File: ../plots/wandb_loss.png Graphic file (type png)
 <use ../plots/wandb_loss.png>
-Package pdftex.def Info: ../plots/wandb_loss.png  used on input line 286.
+Package pdftex.def Info: ../plots/wandb_loss.png  used on input line 287.
 (pdftex.def)             Requested size: 154.78653pt x 81.30759pt.
-<../plots/wandb_eplen.png, id=204, 3806.22pt x 1999.47pt>
+<../plots/wandb_eplen.png, id=304, 3806.22pt x 1999.47pt>
 File: ../plots/wandb_eplen.png Graphic file (type png)
 <use ../plots/wandb_eplen.png>
-Package pdftex.def Info: ../plots/wandb_eplen.png  used on input line 291.
+Package pdftex.def Info: ../plots/wandb_eplen.png  used on input line 292.
 (pdftex.def)             Requested size: 154.78653pt x 81.30759pt.
 File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 300.
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 298.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [8 <../plots/wandb_reward.png> <../plots/wandb_loss.png> <../plots/wandb_eplen
-.png>]
+ [9]
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 300.
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 301.
 (pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
-<../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png, id=217, 867.24
+<../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png, id=314, 867.24
 pt x 361.35pt>
 File: ../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png Graphic fi
 le (type png)
 <use ../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png>
 Package pdftex.def Info: ../plots/benchmark_dvn_vs_greedy_vs_random_20260313_23
-0003.png  used on input line 306.
+0003.png  used on input line 307.
 (pdftex.def)             Requested size: 459.51054pt x 191.46497pt.
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 331.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+
+[10 <../plots/wandb_reward.png> <../plots/wandb_loss.png> <../plots/wandb_eplen
+.png> <../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png>]
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 333.
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 334.
 (pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
 
-Overfull \hbox (5.2523pt too wide) in paragraph at lines 335--336
+Overfull \hbox (5.2523pt too wide) in paragraph at lines 336--337
 \T1/lmr/m/n/10 For the 3P vari-ant, a \T1/lmtt/m/n/10 RoundPlanner3P \T1/lmr/m/
 n/10 wraps the DVN. At each new round it calls \T1/lmtt/m/n/10 get_t_plus_3_can
 didates($\OML/lmm/m/it/10 ^^M$\T1/lmtt/m/n/10 )\T1/lmr/m/n/10 ,
@@ -912,103 +923,159 @@ didates($\OML/lmm/m/it/10 ^^M$\T1/lmtt/m/n/10 )\T1/lmr/m/n/10 ,
 
 File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 338.
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 360.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
-[9 <../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png>]
-LaTeX Info: Redefining \\ on input line 344.
-File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
-<use polytechnique-filetlongrouge.pdf>
-Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 3
-44.
-(pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
-File: polytechnique-filetcourt.pdf Graphic file (type pdf)
-<use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 345.
-(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
-File: polytechnique-filetcourt.pdf Graphic file (type pdf)
-<use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 352.
-(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
+[11]
+<../plots/benchmark_3p_d2_unclipped.png, id=330, 1084.05pt x 361.35pt>
+File: ../plots/benchmark_3p_d2_unclipped.png Graphic file (type png)
+<use ../plots/benchmark_3p_d2_unclipped.png>
+Package pdftex.def Info: ../plots/benchmark_3p_d2_unclipped.png  used on input 
+line 399.
+(pdftex.def)             Requested size: 435.32422pt x 145.10535pt.
 File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 356.
-(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [10]
-<../plots/value_weight_sweep.png, id=236, 1084.05pt x 361.35pt>
-File: ../plots/value_weight_sweep.png Graphic file (type png)
-<use ../plots/value_weight_sweep.png>
-Package pdftex.def Info: ../plots/value_weight_sweep.png  used on input line 36
-7.
-(pdftex.def)             Requested size: 459.51054pt x 153.17197pt.
-LaTeX Info: Redefining \\ on input line 374.
-File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
-<use polytechnique-filetlongrouge.pdf>
-Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 3
-74.
-(pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
-File: polytechnique-logohori.pdf Graphic file (type pdf)
-<use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 378.
-(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
-
-[11 <../plots/value_weight_sweep.png>]
-LaTeX Info: Redefining \\ on input line 396.
-File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
-<use polytechnique-filetlongrouge.pdf>
-Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 3
-96.
-(pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
-File: polytechnique-logohori.pdf Graphic file (type pdf)
-<use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 400.
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 402.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
  [12]
+<../plots/benchmark_3p_d3_unclipped.png, id=341, 1084.05pt x 361.35pt>
+File: ../plots/benchmark_3p_d3_unclipped.png Graphic file (type png)
+<use ../plots/benchmark_3p_d3_unclipped.png>
+Package pdftex.def Info: ../plots/benchmark_3p_d3_unclipped.png  used on input 
+line 405.
+(pdftex.def)             Requested size: 435.32422pt x 145.10535pt.
+<../plots/benchmark_3p_d2_vs_d3_unclipped.png, id=342, 1084.05pt x 361.35pt>
+File: ../plots/benchmark_3p_d2_vs_d3_unclipped.png Graphic file (type png)
+<use ../plots/benchmark_3p_d2_vs_d3_unclipped.png>
+Package pdftex.def Info: ../plots/benchmark_3p_d2_vs_d3_unclipped.png  used on 
+input line 415.
+(pdftex.def)             Requested size: 386.95897pt x 128.98314pt.
 File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 400.
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 420.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [13]
-LaTeX Info: Redefining \\ on input line 402.
+ [13 <../plots/benchmark_3p_d2_unclipped.png> <../plots/benchmark_3p_d3_unclipp
+ed.png> <../plots/benchmark_3p_d2_vs_d3_unclipped.png>]
+LaTeX Info: Redefining \\ on input line 422.
 File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
 <use polytechnique-filetlongrouge.pdf>
 Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 4
-02.
+22.
 (pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 404.
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 423.
 (pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
-LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <9> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 419.
 File: polytechnique-filetcourt.pdf Graphic file (type pdf)
 <use polytechnique-filetcourt.pdf>
-Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 422.
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 429.
 (pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
 File: polytechnique-logohori.pdf Graphic file (type pdf)
 <use polytechnique-logohori.pdf>
-Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 439.
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 445.
 (pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
- [14] (./report.aux)
+ [14]
+File: polytechnique-filetcourt.pdf Graphic file (type pdf)
+<use polytechnique-filetcourt.pdf>
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 445.
+(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
 
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
+Overfull \hbox (45.82669pt too wide) in paragraph at lines 450--451
+\T1/lmr/m/n/10 ful: at the be-gin-ning of each round, we enu-mer-ate all pos-si
+-ble 3-placement se-quences via \T1/lmtt/m/n/10 env.get_t_plus_3_candidates()
+ []
 
+<../plots/value_weight_sweep.png, id=360, 1084.05pt x 361.35pt>
+File: ../plots/value_weight_sweep.png Graphic file (type png)
+<use ../plots/value_weight_sweep.png>
+Package pdftex.def Info: ../plots/value_weight_sweep.png  used on input line 46
+0.
+(pdftex.def)             Requested size: 362.77264pt x 120.92204pt.
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 466.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+[15 <../plots/value_weight_sweep.png>]
+File: polytechnique-filetcourt.pdf Graphic file (type pdf)
+<use polytechnique-filetcourt.pdf>
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 467.
+(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
+<../plots/ckpt_42516k_curves.png, id=369, 1149.093pt x 571.53525pt>
+File: ../plots/ckpt_42516k_curves.png Graphic file (type png)
+<use ../plots/ckpt_42516k_curves.png>
+Package pdftex.def Info: ../plots/ckpt_42516k_curves.png  used on input line 47
+3.
+(pdftex.def)             Requested size: 362.77264pt x 180.43571pt.
+<../plots/benchmark_3p_log.png, id=371, 1003.5894pt x 711.1368pt>
+File: ../plots/benchmark_3p_log.png Graphic file (type png)
+<use ../plots/benchmark_3p_log.png>
+Package pdftex.def Info: ../plots/benchmark_3p_log.png  used on input line 482.
 
-Package rerunfilecheck Warning: File `report.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
+(pdftex.def)             Requested size: 362.77264pt x 257.0616pt.
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 486.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+ [16 <../plots/ckpt_42516k_curves.png>]
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 487.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
 
-Package rerunfilecheck Info: Checksums for `report.out':
-(rerunfilecheck)             Before: 94D0F6383DD8D100A59FAA36AD7150AD;3153
-(rerunfilecheck)             After:  46B99F1E0FFFE1D41AA7DC55014DA020;4762.
+[17 <../plots/benchmark_3p_log.png>]
+LaTeX Info: Redefining \\ on input line 489.
+File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
+<use polytechnique-filetlongrouge.pdf>
+Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 4
+89.
+(pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
+LaTeX Info: Redefining \\ on input line 511.
+File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
+<use polytechnique-filetlongrouge.pdf>
+Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 5
+11.
+(pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 515.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+ [18]
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 516.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+ [19]
+LaTeX Info: Redefining \\ on input line 518.
+File: polytechnique-filetlongrouge.pdf Graphic file (type pdf)
+<use polytechnique-filetlongrouge.pdf>
+Package pdftex.def Info: polytechnique-filetlongrouge.pdf  used on input line 5
+18.
+(pdftex.def)             Requested size: 124.21375pt x 2.16808pt.
+File: polytechnique-filetcourt.pdf Graphic file (type pdf)
+<use polytechnique-filetcourt.pdf>
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 520.
+(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
+LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <9> not available
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 535.
+File: polytechnique-filetcourt.pdf Graphic file (type pdf)
+<use polytechnique-filetcourt.pdf>
+Package pdftex.def Info: polytechnique-filetcourt.pdf  used on input line 538.
+(pdftex.def)             Requested size: 28.40604pt x 2.16808pt.
+File: polytechnique-logohori.pdf Graphic file (type pdf)
+<use polytechnique-logohori.pdf>
+Package pdftex.def Info: polytechnique-logohori.pdf  used on input line 555.
+(pdftex.def)             Requested size: 156.35799pt x 56.90453pt.
+ [20] (./report.aux)
+Package rerunfilecheck Info: File `report.out' has not changed.
+(rerunfilecheck)             Checksum: 1250C3FF4757409F6213E7B1B62CD976;5951.
  ) 
 Here is how much of TeX's memory you used:
- 16116 strings out of 481008
- 236065 string characters out of 5909439
+ 16186 strings out of 481008
+ 237772 string characters out of 5909439
  898576 words of memory out of 5000000
- 32917 multiletter control sequences out of 15000+600000
+ 32960 multiletter control sequences out of 15000+600000
  493183 words of font info for 84 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 83i,12n,88p,877b,1295s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 83i,12n,88p,1126b,1297s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}{/usr/share/texli
 ve/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/share/texlive/texmf-dist/f
 onts/enc/dvips/lm/lm-mathsy.enc}{/usr/share/texlive/texmf-dist/fonts/enc/dvips/
@@ -1034,10 +1101,10 @@ ive/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/share/texlive/texmf-dist/
 fonts/type1/public/lm/lmtt10.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
 lic/lm/lmtt9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/sym
 bols/msbm10.pfb>
-Output written on report.pdf (14 pages, 6628332 bytes).
+Output written on report.pdf (20 pages, 7359696 bytes).
 PDF statistics:
- 404 PDF objects out of 1000 (max. 8388607)
- 325 compressed objects within 4 object streams
- 91 named destinations out of 1000 (max. 500000)
- 219 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 544 PDF objects out of 1000 (max. 8388607)
+ 448 compressed objects within 5 object streams
+ 113 named destinations out of 1000 (max. 500000)
+ 364 words of extra memory for PDF output out of 10000 (max. 10000000)
 
