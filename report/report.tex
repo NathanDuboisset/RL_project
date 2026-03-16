@@ -191,6 +191,7 @@ Despite 1\,000 training episodes, neither DDQN nor Rainbow achieved consistent l
     \item \textbf{Perception overhead}: the network must simultaneously learn piece recognition, valid placements, \emph{and} long-term board value.
 \end{enumerate}
 
+\newpage
 %=============================================================================
 \section{Deep Value Network (DVN)}
 \label{sec:dvn}
@@ -338,8 +339,85 @@ For the 3P variant, a \texttt{RoundPlanner3P} wraps the DVN. At each new round i
 \]
 and executes the best 3-action sequence, replanning if an action becomes invalid.
 
-% TODO: Add results for 3P
+%=============================================================================%
 
+Up to this point, our study has focused on the 1P variant, which significantly simplifies the action space. The core dynamics of \emph{Block Blast}, however, rely on the 3P variant, where three pieces are generated simultaneously and must be placed on the grid to complete a wave. This variant introduces a major combinatorial challenge: the agent is free to choose the order in which the three pieces are played.
+
+\subsubsection{Motivation and Combinatorial Explosion}
+
+Transitioning from 1P to 3P is not merely an increase in the number of pieces, it entails an exponential explosion of the search tree. For a given state with three pieces, there are $3! = 6$ possible placement sequences. Assuming each piece has an average of ten valid positions, evaluating all permutations and positions quickly leads to thousands of potential terminal states for a single wave.
+
+The objective of this section is to verify whether our \textbf{Deep Value Network (DVN)}, initially trained on the 1P variant to evaluate the structural quality of a grid, can be robustly used as a heuristic in a limited-depth search tree (\emph{lookahead}) for the 3P variant.
+
+\subsubsection{Benchmark Methodology}
+
+To quantify the model's performance, we implemented several planning policies and compared them on a rigorous benchmark consisting of 250 episodes  with a discount factor $\gamma = 0.99$. 
+
+As for the 1P setting, the following agents were evaluated:
+\begin{itemize}
+    \item \textbf{Random:} Uniformly selects an action among the legal moves. This approach serves as our lower-bound baseline.
+    \item \textbf{Greedy (Depth-2 \& Depth-3):} A myopic search algorithm that simulates the possibility tree and selects the sequence maximizing the immediate reward (i.e., the score obtained by clearing lines) during the current wave.
+    \item \textbf{DVN (Depth-2 \& Depth-3):} The agent uses our value network to evaluate potential \emph{afterstates}. The optimal sequence of actions $\mathcal{S}^*$ is chosen by maximizing the sum of immediate rewards and the discounted future value of the resulting state:
+    \begin{equation}
+        \mathcal{S}^* = \arg\max_{\mathcal{S}} \left( \sum_{r_t \in \mathcal{S}} \gamma^t r_t + \gamma^k V_{\theta}(s_{\text{final}}) \right)
+    \end{equation}
+    where $V_{\theta}$ is the value predicted by the network and $k$ is the depth of the simulation within the tree.
+\end{itemize}
+
+\subsubsection{Results and Superiority of the DVN}
+
+The performances of the agents at depth 2 (anticipating the placement of 2 pieces) reveal a striking performance gap. The statistics computed over our main sample of 250 episodes are summarized in the table below:
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lrr}
+        \toprule
+        \textbf{Policy} & \textbf{Mean Reward (Score)} & \textbf{Mean Length (Steps)} \\
+        \midrule
+        DVN depth-2 & \textbf{23\,412.72} & \textbf{209.29} \\
+        DVN depth-3 & \textbf{47\,469.39} & \textbf{ 223.72} \\
+        Greedy depth-2 & 1\,884.90 & 44.45 \\
+        Random & 25.33 & 11.93 \\
+        \bottomrule
+    \end{tabular}
+    \caption{Performance comparison of the agents on the 3P variant (250 episodes, $\gamma=0.99$).}
+    \label{tab:benchmark_3p_main}
+\end{table}
+
+Several decisive conclusions emerge from these results:
+
+\begin{enumerate}
+    \item \textbf{The Failure of the Greedy Approach:} The \emph{Greedy} agent demonstrates that pure short-term reward maximization is deeply suboptimal for \emph{Block Blast}. By focusing entirely on immediate line clears to score points, the \emph{Greedy} policy tends to fragment the free space on the grid. This rapidly makes the board unplayable, leading to premature game overs at around 44 steps on average.
+    
+    \item \textbf{The Geometric Understanding of the DVN:} Conversely, the DVN depth-2 agent survives nearly five times longer ($\sim$209 steps) and achieves a massive average score of over 23,400 points. This proves that the network successfully captured the "intrinsic value" of a board. It is capable of sacrificing immediate rewards (e.g., delaying a line clear) if it identifies that doing so preserves a healthier grid topology, thereby mitigating the risk of a game over.
+    
+    \item \textbf{Impact of Higher Depth (Depth-3):} Expanding the evaluation to depth 3 allows the agent to anticipate the entire wave. Although significantly more computationally expensive due to the massive number of states evaluated in batches by the network, this increased depth should enable the agent to avoid geometric dead ends that only become apparent when placing the third piece of the draw. In practice, we observed significantly higher rewards with this increased depth (the rewards doubled) whereas the length of the episodes remained about the same (which may be due to the small number of episodes used for evaluation at depth 3, due to the computation cost of this policy). 
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+        \includegraphics[width=0.9\textwidth]{../plots/benchmark_3p_d2_unclipped.png}
+        \caption{Performance of the DVN for a depth 2 look ahead}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+        \includegraphics[width=0.9\textwidth]{../plots/benchmark_3p_d3_unclipped.png}
+        \caption{Performance of the DVN for a depth 3 look ahead}
+\end{figure}
+
+\subsubsection{Computational Bottlenecks and Limitations}
+
+While the \emph{Deep Value Network} proves extremely effective at navigating this large combinatorial space, its exhaustive application quickly becomes a computational bottleneck. Performing inference on all \emph{leaf boards} at depth 3 requires evaluating very large tensors by batch on the GPU and limiting ourselves to the much more reasonable depth of 2 for the lookahead might be interesting. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../plots/benchmark_3p_d2_vs_d3_unclipped.png}
+    \caption{Performance comparison according to the depth of the lookahead}
+\end{figure}
+
+
+\newpage
 %=============================================================================
 \section{Proximal Policy Optimization (PPO)}
 \subsection{Principle}
