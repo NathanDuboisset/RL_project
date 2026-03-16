@@ -426,35 +426,72 @@ The policy is updated by maximizing a clipped surrogate objective:
 $$L^{CLIP}(\theta)=\mathbb{E}_t[min(r_t(\theta)\hat{A}^t,clip(r_t(\theta),1-\epsilon,1+\epsilon)\hat{A}^t)]$$
 where $r_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}$ 
 is the probability ratio and $\hat{A}_t$ is the advantage estimate computed via GAE using the value head $V_\phi(s)$ trained alongside the policy. The policy head produces logits over the 192 possible placements (3 pieces $\times$ 64 positions), with invalid placements masked to $-\infty$ prior to sampling. During training, actions are sampled stochastically from the resulting distribution; during evaluation, the policy acts greedily by taking the argmax of the masked logits. The advantage of PPO over DVN is that it does not require enumerating all valid afterstates at each step, making it more scalable to the large action space of Block Blast.
+\subsection{Architecture}
+The PPO networks encodes separately the board , the pieces and the scalar informations :
+\begin{itemize}
+    \item \textbf{Board branch}:  $8\times8$ \\ $\to$ Conv2d($1\to32$, $k=3$) $\to$ Conv2d($32\to64$, $k=3$) $\to$ Conv2d($64\to64$, $k=3$)$\to$ Flatten +Linear$\to$ 128 features.
+    \item \textbf{3-Pieces branch}:  $3\times(5\times5)$ \\ $\to$ Conv2d($3\to32$, $k=3$) $\to$ Conv2d($32\to32$, $k=3$) $\to$ Flatten +Linear$\to$ 64 features.
+    \item \textbf{Combo \& pieces used branch}:  (Combo$/10$ + pieces\_used) concatenated$\to$ Linear($4\to32$) + ReLU
+\end{itemize}
+The output vectors are then concatenated into a $224-d$ vector and then passed into \textbf{a common MLP} for policy and value : Linear($224\to256$) $\to$ ReLU$\to$Linear($256\to256$) $\to$ ReLU.
+
+For the policy head, the output state is of dimension $192 = 3 \times 64$. Here is the architetcure of this head : Linear($256\to192$) $\to$ masking of invalid actions to $- \infty$+ ctaegorical logits for sampling.
+
+For the value head :  Linear($256\to256$) $\to$ Linear($256\to1$). The prediction is in the symplog space, as the transformation $sign(x)\cdot log(1+|x|)$ is applied to the rewards before being stocked in the buffer, to compress the value that can be exponentially high.
+
+In total, this architecture has approximately 848k parameters, which is 20 times more than the DVN.
+
 
 \subsection{Arborescent search upgrade}
-To enhance PPO that makes its decisions by a stochastic sampling, we use Monte Carlo Tree Search to have an exhaustive planning of depth 3 in the environment with 3 pieces - it is a loosely inspired from AlphaZero but adapted for Block Blast. The key idea is that the environment is deterministic at each round, it is therefore possible to enumerate all possible placements and to choose the best one, guided by the value network from PPO.
+To enhance PPO that makes its decisions by a stochastic sampling, we use Monte Carlo Tree Search (MCTS) to have an exhaustive planning of depth 3 in the environment with 3 pieces - it is a loosely inspired from AlphaZero but adapted for Block Blast, we call this approach "MCTS First only". The key idea is that the environment is deterministic at each round, it is therefore possible to enumerate all possible placements and to choose the best one, guided by the value network from PPO.
 
 At the beginning of each round (3 pieces to place), all authorized sequences of 3 placements are calculated and scored as the weighted sum of the cumulated reward over the last 3 placements and the value of the terminal state estimated by PPO's value network. The agent then plays the first action of the best sequence, and to continue the round, PPO is simply used in a deterministic manner (with the argmax of the logits). With this upgrade, the mean length of the episodes increases from 25.2 to 36.7, which is a substantial upgrade.
 
-We also tried a more deterministic approach, which turned out to be the most successful: at the beginning of each round, we enumerate all possible 3-placement sequences via \texttt{env.get\_t\_plus\_3\_candidates()} and score each terminal state \texttt{S(t+3)} with the formula: 
+We also tried a more deterministic approach, "MCTS Full Triplet", which turned out to be the most successful: at the beginning of each round, we enumerate all possible 3-placement sequences via \texttt{env.get\_t\_plus\_3\_candidates()} and score each terminal state \texttt{S(t+3)} with the formula: 
 \[
 \text{score} = symlog(r_{t+1} + \gamma r_{t+2} + \gamma^2 r_{t+3}) + \alpha \cdot symlog(V_\theta(s_{t+3}))
 \]
-Both terms are kept in symlog space for comparable scales, and because some runs showed that this value could be explosive. The parameter $\alpha$ is a value weight hyperparameter that controls the relative influence of the PPO value network on the score. Hence $\alpha =0$ means that the agent completely ignores the value network and the model is totally deterministic. Once the best-scoring sequence is identified, all three actions are stored in a queue and executed in order without re-searching at steps 2 and 3. Furthermore, for the sake of efficiency, the value network inference is batched: all candidate terminal boards are stacked into a single tensor and processed in chunks of 512 through the PPO \texttt{ActorCritic} network, making the scoring step GPU-efficient despite the potentially large number of candidates.
+Both terms are kept in symlog space for comparable scales, and because some runs showed that this value could be explosive. The parameter $\alpha$ is a value weight hyperparameter that controls the relative influence of the PPO value network on the score. Hence $\alpha =0$ means that the agent completely ignores the value network and the model is totally deterministic. Once the best-scoring sequence is identified, all three actions are stored in a queue and executed in order without re-searching at steps 2 and 3. As the pieces of the round after \texttt{S(t+3)} are unknown, the PPO pre-trained value network receives a neutral, uninformative piece context  : \texttt{pieces\_padded}, \texttt{pieces\_used} and \texttt{combo\_after} are all set to 0. Furthermore, for the sake of efficiency, the value network inference is batched: all candidate terminal boards are stacked into a single tensor and processed in chunks of 512 through the PPO \texttt{ActorCritic} network, making the scoring step GPU-efficient despite the potentially large number of candidates.
 
 To determine the optimal $\alpha$ value and to see if there exists a balance between the deterministic and stochastic aspects of this approach, we conducted a sweep over several values, evaluating each configuration over 50 episodes and measuring several metrics.
 
-\begin{figure}
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\textwidth]{../plots/value_weight_sweep.png}
+    \includegraphics[width=0.75\textwidth]{../plots/value_weight_sweep.png}
     \caption{Mean return, median return and mean episode length for different values of alpha}
     \label{fig:weightsweep}
 \end{figure}
 
-We observed in practice that the score of the PPO value network is an order of magnitude higher than the score given by the exploration of terminal states. On the figure above, we can note the best results are obtained with $\alpha \in [0.1, 0.5]$, confirming the fact that this problem cannot be simply treated with a brute force approach. We can furthermore note that for such values, the mean length of an episode is around 550, which is the highest score we achieved. However, the research of the terminal state is computationally expensive and take on average approximately 1100 ms per 3-step sequence.
+We observed in practice in Figure~\ref{fig:weightsweep} that the score of the PPO value network is an order of magnitude higher than the score given by the exploration of terminal states. On the figure above, we can note the best results are obtained with $\alpha \in [0.1, 0.5]$, confirming the fact that this problem cannot be simply treated with a brute force approach. We can furthermore note that for such values, the mean length of an episode is around 550, which is the highest score we achieved. However, the research of the terminal state is computationally expensive and take on average approximately 1100 ms per 3-step sequence.
+
+\subsection{Results}
+
+In this section, we present several results we obtained based on PPO trained over 43 millions environment steps. On the Figure~\ref{fig:ppo_curves}, the agent exhibits rapid initial learning up to 5M steps, followed by a slow logarithmic progression for the mean and median episode reward. The persistent mean-median gap reflects the stochastic nature of piece distribution. The episode length grows until 20M steps, where it plateaus, corresponding to roughly 7 complete rounds on average. The value loss increases monotonically without converging, suggesting that the continuously improving policy shifts the return distribution faster than the value network can track, degrading GAE advantage estimates over time. However, the policy loss remains stable,confirming that PPO clipping is effective and updates remain conservative. Finally, the entropy drops sharply in the first 2M steps as the agent the agent transitions from a near-uniform policy to one with strong action preferences, and then continues to decay slowly reflecting a moderately deterministic but not fully collapsed policy.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{../plots/ckpt_42516k_curves.png}
+    \caption{Learning curves of PPO model trained over 42M steps}
+    \label{fig:ppo_curves}
+\end{figure}
+
+The benchmarks results in log scale in Figure~\ref{fig:Benchmark_PPO} , reveal a striking performance hierarchy across the three planning strategies. MCTS First only achieve a weak improvement over PPO greedy, while MCTS Full Triplet produces results several orders of magnitude higher, demonstrating that the key factor is not the exhaustive search itself but the coherent execution of the full 3-action sequence.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{../plots/benchmark_3p_log.png}
+    \caption{Benchmark results in log scale comparing PPO greedy, MCTS First only and MCTS Full Triplet.}
+    \label{fig:Benchmark_PPO}
+\end{figure}
+
+\newpage
 %=============================================================================
 \section{Discussion and Future Work}
 
 \paragraph{Why DVN outperforms DQN.}
 The DVN decouples \emph{what the board looks like after the move} from \emph{which action achieves it}. The value network only needs to learn a board-to-value mapping---far simpler than the full Q-function which also encodes piece geometry and placement logic.
 \paragraph{Why PPO outperforms DVN.}
-While DVN learns a value function solely over afterstates - i.e. the resulting board configuration after a single placement, independently of the remaining pieces or the current position within the round - PPO conditions its value estimate on the full observation: the current board, the three available pieces, the piece usage flags \texttt{pieces\_used}, and the combo counter. This richer conditioning is particularly beneficial in the context of tree search: when scoring a terminal state $s_{t+3}$, the PPO value network $V_\phi(s_{t+3})$ has access to the complete context of the position, whereas a DVN-based scorer evaluates the resulting board in isolation. As a result, the value network from PPO provides a more informed heuristic for guiding the search.
+While DVN learns a value function solely over afterstates - i.e. the resulting board configuration after a placement, independently of the remaining pieces or the current position within the round - PPO conditions its value estimate on the full observation: the current board, the three available pieces, the piece usage flags \texttt{pieces\_used}, and the combo counter. This richer conditioning is particularly beneficial in the context of tree search: when scoring a terminal state $s_{t+3}$, the PPO value network $V_\phi(s_{t+3})$ has access to the complete context of the position, whereas a DVN-based scorer evaluates the resulting board in isolation. As a result, the value network from PPO provides a more informed heuristic for guiding the search.
 \paragraph{Limitations.}
 \begin{itemize}
     \item The value function sees only the afterstate board, \emph{not} upcoming pieces.
@@ -475,6 +512,7 @@ While DVN learns a value function solely over afterstates - i.e. the resulting b
 
 We have presented a reinforcement learning study of Block Blast. Standard DQN approaches (DDQN, Rainbow, $\sim$2.67M parameters) struggled to converge within the training budget. A Deep Value Network operating on afterstates---with only 42\,461 parameters and a multi-kernel CNN architecture---achieved substantially better performance. The main advantage of the DVN approach is that it does not need to learn the basic mechanics and geometry of the game, since these are handled implicitly by the afterstate generation. However, its true limitation remains the high variance across episodes. Ultimately, what truly allowed the agent to progress from an average of $\sim$30 steps to $\sim$60 steps was the proper design and tuning of the reward shaping.
 
+We additionally trained a PPO-agent ($\sim$ 848k parameters) on the 3-p variant, reaching a mean episode length of 22 steps.PPO's richer observation allowed it to reason over the full round context, but its step-by-step policy optimization prevents it from discovering multi-piece combinatorial strategies. By augmenting PPO with an exhaustive tree search at each round yielded a dramatic performance jump to a mean return of $\sim$451k and mean episode length of $\sim$687 steps, highlighting that the intra-round planning is the critical bottleneck encountered by pure-gradient methods in our approach.
 \newpage
 \appendix
 \section{Model Architectures}
