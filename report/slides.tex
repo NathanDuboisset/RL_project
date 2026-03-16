@@ -1,7 +1,7 @@
 \documentclass[aspectratio=169,10pt]{beamer}
 
 \usetheme{Madrid}
-\usecolortheme{seahorse}
+\usecolortheme{default}
 \usefonttheme{professionalfonts}
 
 \usepackage[utf8]{inputenc}
@@ -18,33 +18,70 @@
 \usepackage{array}
 \usepackage{colortbl}
 
-\definecolor{blockblue}{RGB}{30,90,180}
-\definecolor{blockorange}{RGB}{220,100,20}
-\definecolor{blockgreen}{RGB}{30,150,80}
+% Official Polytechnique colors
+\definecolor{bleu303}{RGB}{0,62,92}
+\definecolor{bleu303pale}{RGB}{204,221,230}
+\definecolor{rouge485}{RGB}{213,43,30}
+\definecolor{bleu315}{RGB}{0,104,128}
 
-\setbeamercolor{frametitle}{bg=blockblue!85!black, fg=white}
-\setbeamercolor{title}{fg=white}
+% Set Polytechnique style
+\setbeamercolor{frametitle}{bg=bleu303, fg=white}
+\setbeamercolor{title}{bg=bleu303, fg=white}
+\setbeamercolor{subtitle}{fg=white}
 \setbeamercolor{author}{fg=white}
 \setbeamercolor{date}{fg=white}
 \setbeamercolor{institute}{fg=white}
-\setbeamercolor{block title}{bg=blockblue!70, fg=white}
-\setbeamercolor{block body}{bg=blockblue!8}
-\setbeamercolor{alerted text}{fg=blockorange}
+\setbeamercolor{block title}{bg=bleu303, fg=white}
+\setbeamercolor{block body}{bg=bleu303pale, fg=black}
+\setbeamercolor{alerted text}{fg=rouge485}
+\setbeamercolor{example text}{fg=bleu315}
+\setbeamercolor{section number projected}{bg=bleu303, fg=white}
+\setbeamercolor{subsection number projected}{bg=bleu315, fg=white}
+\setbeamercolor{item}{fg=bleu303}
+\setbeamercolor{subitem}{fg=bleu315}
+\setbeamercolor{subsubitem}{fg=rouge485}
+
+\setbeamerfont{frametitle}{series=\bfseries}
+\setbeamerfont{title}{series=\bfseries, size=\Large}
+\setbeamerfont{subtitle}{series=\bfseries, size=\large}
+\setbeamerfont{author}{series=\bfseries, size=\normalsize}
+\setbeamerfont{date}{size=\normalsize}
+
+% Custom title page template
+\defbeamertemplate*{title page}{polytechnique}[1][]
+{
+  \begin{beamercolorbox}[sep=0pt, wd=\paperwidth, ht=\paperheight]{title}
+    \begin{tikzpicture}[remember picture, overlay]
+      \fill[bleu303] (current page.south west) rectangle (current page.north east);
+    \end{tikzpicture}
+    \centering
+    \vspace*{2cm}
+    {\usebeamerfont{title}\usebeamercolor[fg]{title}\inserttitle\par}
+    \vspace*{0.5cm}
+    {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}
+    \vspace*{2cm}
+    {\usebeamerfont{author}\usebeamercolor[fg]{author}\insertauthor\par}
+    \vspace*{0.5cm}
+    {\usebeamerfont{date}\usebeamercolor[fg]{date}\insertdate\par}
+  \end{beamercolorbox}
+}
 
 \lstset{
     basicstyle=\ttfamily\scriptsize,
     breaklines=true,
-    backgroundcolor=\color{gray!10},
-    keywordstyle=\color{blockblue}\bfseries,
-    commentstyle=\color{blockgreen}\itshape,
+    backgroundcolor=\color{bleu303!5},
+    keywordstyle=\color{bleu303}\bfseries,
+    commentstyle=\color{bleu315}\itshape,
     frame=single,
     language=Python
 }
 
 \title[\textbf{RL for Block Blast}]{\textbf{Reinforcement Learning for Block Blast}}
-\subtitle{From Deep Q-Networks to Deep Value Networks}
+\subtitle{From DQN to DVN to PPO + MCTS}
 \author{Nathan}
 \date{March 2026}
+
+\setbeamertemplate{title page}[polytechnique]
 
 \AtBeginSection[]{
   \begin{frame}
@@ -517,29 +554,16 @@ The DVN value function is \textbf{shared} between 1P and 3P — the planner is j
 \section{Results}
 
 %-----------------------------------------------------------------------------
-\begin{frame}{Benchmark: DVN vs.\ Greedy vs.\ Random}
-\begin{center}
-\includegraphics[width=0.90\textwidth]{../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png}
-\end{center}
-\vspace{-0.3em}
-\footnotesize Episode return (left) and episode length (right) distributions over 200 evaluation episodes.
-\end{frame}
-
-%-----------------------------------------------------------------------------
-\begin{frame}{Results Summary}
+\begin{frame}{Results: 1P Benchmark}
 \begin{columns}[T]
-\begin{column}{0.54\textwidth}
-\begin{block}{Observations}
-\begin{itemize}
-    \item \textbf{Trained DVN}: $\sim$60 avg steps per episode
-    \item \textbf{Untrained DVN}: $\sim$20 steps (random play)
-    \item \textbf{Greedy baseline}: picks highest immediate reward — shortsighted, over-fills board
-    \item \textbf{DVN} outperforms greedy in episode length by learning to preserve board space
-\end{itemize}
-\end{block}
+\begin{column}{0.50\textwidth}
+\begin{center}
+\includegraphics[width=0.95\textwidth]{../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png}
+\end{center}
+\footnotesize Episode steps (left) and return (right) over 200 episodes.
 \end{column}
 
-\begin{column}{0.42\textwidth}
+\begin{column}{0.46\textwidth}
 \begin{tabular}{lcc}
 \toprule
 Agent & Avg Steps & Params \\
@@ -552,38 +576,164 @@ DDQN 1P  & $\sim$20 & 2.67M \\
 Rainbow  & $\sim$20 & 2.67M \\
 \bottomrule
 \end{tabular}
-\end{column}
-\end{columns}
 
 \vspace{0.5em}
-\begin{exampleblock}{Takeaway}
-The DVN learns real long-term value with $63\times$ fewer parameters than DQN-based approaches, by leveraging environment structure (precomputed afterstates).
+\begin{exampleblock}{Key Result}
+$63\times$ fewer parameters, better performance.
 \end{exampleblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{Results: 3P Benchmark (250 episodes, $\gamma=0.99$)}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{Performance Comparison}
+\begin{tabular}{lcc}
+\toprule
+Agent & Mean Reward & Mean Steps \\
+\midrule
+Random & 25.33 & 11.93 \\
+Greedy (D2) & 1\,884.90 & 44.45 \\
+DVN (D2) & 23\,412.72 & 209.29 \\
+DVN (D3) & 47\,469.39 & 223.72 \\
+\bottomrule
+\end{tabular}
+\end{block}
+
+\vspace{0.5em}
+\begin{exampleblock}{Insights}
+\begin{itemize}
+    \item DVN depth-2: $\sim 5\times$ longer than greedy
+    \item DVN depth-3: $\sim 480\times$ higher reward
+    \item Preserved space wins over immediate lines
+\end{itemize}
+\end{exampleblock}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{alertblock}{Computational Cost}
+Exhaustive enumeration: $3! \times 64^k$ candidates at depth $k$.
+
+\vspace{0.3em}
+Depth-3: very expensive without GPU batching.
+\end{alertblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+%=============================================================================
+\section{Proximal Policy Optimization (PPO)}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{PPO: A Stochastic Policy Approach}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{Architecture}
+\begin{itemize}
+    \item \textbf{BoardEncoder}: Conv stack on $8\times8$ $\to$ 128-d
+    \item \textbf{PiecesEncoder}: 3 pieces $\to$ 64-d
+    \item \textbf{ScalarEncoder}: combo, usage flags $\to$ 32-d
+    \item \textbf{Trunk}: MLP $(224 \to 256)$
+    \item \textbf{Heads}: policy $(256 \to 192)$ and value $(256 \to 1)$
+\end{itemize}
+\end{block}
+
+\vspace{0.3em}
+\begin{exampleblock}{Key Difference from DVN}
+PPO conditions value on \textbf{full observation}: current board, all 3 pieces, piece usage, combo counter.
+\end{exampleblock}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{block}{Training}
+Clipped surrogate loss:
+\[
+L^{\text{CLIP}} = \mathbb{E}[\min(r_t \hat{A}_t, \text{clip}(r_t) \hat{A}_t)]
+\]
+where $r_t = \frac{\pi_\theta(a|s)}{\pi_{\theta_{\text{old}}}(a|s)}$
+
+\vspace{0.3em}
+Advantage $\hat{A}_t$ via GAE with value head.
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{PPO + MCTS Tree Search}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\begin{block}{Algorithm}
+At each round (3 pieces):
+\begin{enumerate}
+    \item Enumerate all $3! \times 64^3$ candidate sequences
+    \item Score each terminal state:
+    \[
+    \text{score} = \text{symlog}(\sum r_i) + \alpha \cdot \text{symlog}(V_\phi(s_{t+3}))
+    \]
+    \item Execute best 3-action sequence
+    \item \textbf{Batch inference}: process 512 boards at a time on GPU
+\end{enumerate}
+\end{block}
+
+\vspace{0.3em}
+\begin{exampleblock}{Hyperparameter Sweep}
+Optimal $\alpha \in [0.1, 0.5]$ balances immediate reward and value heuristic.
+\end{exampleblock}
+\end{column}
+
+\begin{column}{0.42\textwidth}
+\begin{alertblock}{Performance Gain}
+\begin{itemize}
+    \item \textbf{Baseline PPO}: $\sim$25 avg steps
+    \item \textbf{PPO + MCTS}: $\sim$550 avg steps
+    \item Cost: $\sim$1100 ms per round
+\end{itemize}
+\end{alertblock}
+
+\vspace{0.3em}
+\begin{block}{Richer Conditioning}
+PPO value $V_\phi(s_{t+3})$ sees full context at terminal state, not isolated afterstate.
+\end{block}
+\end{column}
+\end{columns}
 \end{frame}
 
 %=============================================================================
 \section{Discussion \& Future Work}
 
 %-----------------------------------------------------------------------------
-\begin{frame}{Discussion}
+\begin{frame}{DVN vs.\ DQN vs.\ PPO}
 \begin{columns}[T]
-\begin{column}{0.48\textwidth}
-\begin{exampleblock}{Why DVN $>$ DQN here}
+\begin{column}{0.54\textwidth}
+\begin{exampleblock}{Why DVN $>$ DQN}
 \begin{itemize}
-    \item Decouples \emph{``what does this board look like?''} from \emph{``which action achieves it?''}
-    \item No need to reason about piece geometry in the value net
-    \item Simpler learning objective = more sample-efficient
-    \item Valid constraints automatically respected
+    \item Decouples \emph{``board state''} from \emph{``action selection''}
+    \item No need to reason about piece geometry
+    \item Simpler learning objective $\Rightarrow$ sample-efficient
+    \item Valid constraints implicit
+\end{itemize}
+\end{exampleblock}
+
+\vspace{0.3em}
+\begin{exampleblock}{Why PPO $>$ DVN (with MCTS)}
+\begin{itemize}
+    \item Full observation conditioning: sees all pieces + state
+    \item Richer value heuristic for search
+    \item Stochastic policy naturally explores
+    \item MCTS exhaustive evaluation within depth
 \end{itemize}
 \end{exampleblock}
 \end{column}
 
-\begin{column}{0.48\textwidth}
-\begin{alertblock}{Current Limitations}
+\begin{column}{0.42\textwidth}
+\begin{alertblock}{Limitations}
 \begin{itemize}
-    \item Value function is \textbf{piece-agnostic}: a board's value depends on what pieces come next
-    \item 3P planner is \textbf{computationally expensive} (exhaustive enumeration)
-    \item Training still requires many episodes; no curriculum
+    \item DVN: piece-agnostic, limited lookahead
+    \item PPO+MCTS: $O(3! \times 64^k)$ enumeration cost
+    \item Piece randomness: truly random (harder than real game)
 \end{itemize}
 \end{alertblock}
 \end{column}
@@ -592,39 +742,48 @@ The DVN learns real long-term value with $63\times$ fewer parameters than DQN-ba
 
 %-----------------------------------------------------------------------------
 \begin{frame}{Future Work}
-\begin{block}{Immediate Improvements}
+\begin{block}{Short-term Improvements}
 \begin{itemize}
-    \item \textbf{Include upcoming piece info}: encode next piece(s) as extra input channels in $V_\theta$
-    \item \textbf{Hand-crafted feature branch}: holes count, row/column fill density, height variance — well-studied in Tetris literature
-    \item \textbf{Batch 3P lookahead on GPU}: use tensor operations over all $3! \times 64^3$ candidates for tractable online evaluation
+    \item Encode \textbf{next pieces} as input channels for DVN
+    \item Hand-crafted features: hole count, row/column density, height variance (Tetris-inspired)
+    \item \textbf{GPU-batched lookahead} for faster 3P evaluation
 \end{itemize}
 \end{block}
 
 \vspace{0.5em}
-\begin{exampleblock}{Longer-Term Directions}
+\begin{block}{Longer-term Research}
 \begin{itemize}
-    \item \textbf{MCTS + DVN}: use the value function as a rollout evaluator in Monte Carlo Tree Search for deeper planning
-    \item \textbf{Self-play curriculum}: progressively harder piece distributions
-    \item \textbf{Model-based RL}: learn a transition model from afterstates to plan deeper than 1-step
+    \item \textbf{Curriculum learning}: progressively harder piece distributions
+    \item \textbf{Model-based RL}: learn transition model for deeper planning
+    \item \textbf{Hybrid}: combine PPO stochasticity with DVN piece-agnostic structure
 \end{itemize}
-\end{exampleblock}
+\end{block}
 \end{frame}
 
 %-----------------------------------------------------------------------------
 \begin{frame}{Conclusion}
-\begin{block}{Summary}
+\begin{block}{Key Takeaways}
 \begin{enumerate}
-    \item Designed and implemented \textbf{two Block Blast environments} (1P and 3P) with Gymnasium, including precomputed afterstates
-    \item Iterated on \textbf{reward shaping}: quadratic combo reward was too sparse; dense survival + emptiness reward works better
-    \item \textbf{DDQN and Rainbow DQN} ($\sim$2.67M params) failed to converge meaningfully in 1,000 episodes due to sparse rewards and large Q-function complexity
-    \item \textbf{Deep Value Network} (42,461 params, multi-kernel CNN): learns $V(\text{afterstate})$ with TD learning, combined with 1-step lookahead for action selection
-    \item DVN achieves $\sim$60 average episode steps vs.\ $\sim$30 for greedy, with $63\times$ fewer parameters
+    \item \textbf{Environment design}: precomputed afterstates unlock efficient RL approaches
+    
+    \vspace{0.3em}
+    \item \textbf{Reward shaping matters}: sparse quadratic bonus $\to$ dense survival + emptiness bonus
+    
+    \vspace{0.3em}
+    \item \textbf{DVN}: 42K parameters, $63\times$ smaller than DQN/Rainbow, achieves $\sim$60 steps via structure exploitation
+    
+    \vspace{0.3em}
+    \item \textbf{PPO + MCTS}: $\sim$550 steps via tree search + learned value heuristic (limited by enumeration cost)
+    
+    \vspace{0.3em}
+    \item \textbf{Lesson}: Leverage environment structure $>$ bigger models
 \end{enumerate}
 \end{block}
 
-\vspace{1em}
+\vspace{0.8em}
 \centering
-\textbf{Leveraging environment structure is more powerful than bigger models.}
+\normalsize
+\textbf{From Deep Q-Networks to Value Functions to Guided Tree Search}
 \end{frame}
 
 %-----------------------------------------------------------------------------
