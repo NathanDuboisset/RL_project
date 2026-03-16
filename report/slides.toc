@@ -1,0 +1,8 @@
+\babel@toc {english}{}\relax 
+\beamer@sectionintoc {1}{The Game: Block Blast}{3}{0}{1}
+\beamer@sectionintoc {2}{Reward Shaping}{7}{0}{2}
+\beamer@sectionintoc {3}{DQN-Based Approaches}{10}{0}{3}
+\beamer@sectionintoc {4}{Deep Value Network (DVN)}{13}{0}{4}
+\beamer@sectionintoc {5}{Results}{19}{0}{5}
+\beamer@sectionintoc {6}{Proximal Policy Optimization (PPO)}{22}{0}{6}
+\beamer@sectionintoc {7}{Discussion \& Future Work}{25}{0}{7}
