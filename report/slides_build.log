@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (MiKTeX 26.2) (preloaded format=pdflatex 2026.3.13)  17 MAR 2026 13:48
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (MiKTeX 26.2) (preloaded format=pdflatex 2026.3.13)  17 MAR 2026 14:06
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1234,21 +1234,58 @@ Package pgfplots notification 'compat/show suggested version=true': document ha
 s been generated with the most recent feature set (\pgfplotsset{compat=1.18}).
 
 (slides_build.nav)
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 93--93
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 98--98
+ [][]  
+ []
+
+
 Overfull \vbox (12.2459pt too high) detected at line 98
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
  []
 
 [1
 
 {C:/Users/keyva/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}{C:/Users/keyv
 a/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/cm-super/cm-super-t1.enc}]
-(slides_build.toc) [2
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 103--103
+ [][]  
+ []
 
-] (slides_build.toc) [3
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[2
 
 ]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 106--106
+ [][]  
+ []
+
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[3
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 147--147
+ [][]  
+ []
+
 LaTeX Font Info:    Trying to load font information for U+msa on input line 147
 .
-
 (C:\Users\keyva\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
@@ -1258,10 +1295,18 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 147
 (C:\Users\keyva\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
 [4
 
 {C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/cm-super/cm-super
 -ts1.enc}]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 166--166
+ [][]  
+ []
+
 <board1p.png, id=265, 459.6372pt x 237.0456pt>
 File: board1p.png Graphic file (type png)
 <use board1p.png>
@@ -1272,42 +1317,155 @@ File: board3p.png Graphic file (type png)
 <use board3p.png>
 Package pdftex.def Info: board3p.png  used on input line 166.
 (pdftex.def)             Requested size: 198.46887pt x 59.34082pt.
- [5
 
- <./board1p.png> <./board3p.png>] [6
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
 
-] [7
+[5
 
-] (slides_build.toc)
+ <./board1p.png> <./board3p.png>]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 201--201
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[6
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 234--234
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[7
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 237--237
+ [][]  
+ []
+
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
 [8
 
-] [9
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 271--271
+ [][]  
+ []
 
-] [10
 
-] (slides_build.toc) [11
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
 
-] [12
-
-] [13
+[9
 
 ]
-<../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png, id=791, 867.24
-pt x 361.35pt>
-File: ../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png Graphic fi
-le (type png)
-<use ../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png>
-Package pdftex.def Info: ../plots/benchmark_dvn_vs_greedy_vs_random_20260313_23
-0003.png  used on input line 397.
-(pdftex.def)             Requested size: 247.39241pt x 103.07954pt.
- [14
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 307--307
+ [][]  
+ []
 
- <../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png>] (slides_buil
-d.toc) [15
 
-] [16
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[10
 
 ]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 310--310
+ [][]  
+ []
+
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[11
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 353--353
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[12
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 375--375
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[13
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 397--397
+ [][]  
+ []
+
+<traindqn.png, id=791, 1088.3862pt x 498.663pt>
+File: traindqn.png Graphic file (type png)
+<use traindqn.png>
+Package pdftex.def Info: traindqn.png  used on input line 397.
+(pdftex.def)             Requested size: 247.39241pt x 113.34328pt.
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[14
+
+ <./traindqn.png>]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 400--400
+ [][]  
+ []
+
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[15
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 438--438
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[16
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 451--451
+ [][]  
+ []
+
 <../plots/wandb_reward.png, id=947, 3806.22pt x 1999.47pt>
 File: ../plots/wandb_reward.png Graphic file (type png)
 <use ../plots/wandb_reward.png>
@@ -1323,21 +1481,79 @@ File: ../plots/wandb_eplen.png Graphic file (type png)
 <use ../plots/wandb_eplen.png>
 Package pdftex.def Info: ../plots/wandb_eplen.png  used on input line 451.
 (pdftex.def)             Requested size: 134.92459pt x 70.87337pt.
- [17
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[17
 
  <../plots/wandb_reward.png> <../plots/wandb_loss.png> <../plots/wandb_eplen.pn
 g>]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 493--493
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
 [18
 
-] [19
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 533--533
+ [][]  
+ []
 
-] [20
 
-] [21
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
 
-] (slides_build.toc) [22
+[19
 
 ]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 567--567
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[20
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 605--605
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[21
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 608--608
+ [][]  
+ []
+
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[22
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 640--640
+ [][]  
+ []
+
 <../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png, id=1283, 867.2
 4pt x 361.35pt>
 File: ../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png Graphic fi
@@ -1346,47 +1562,162 @@ le (type png)
 Package pdftex.def Info: ../plots/benchmark_dvn_vs_greedy_vs_random_20260311_18
 1312.png  used on input line 640.
 (pdftex.def)             Requested size: 206.74025pt x 86.14131pt.
- [23
 
- <../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png>] [24
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
 
-] (slides_build.toc) [25
+[23
 
-] [26
+ <../plots/benchmark_dvn_vs_greedy_vs_random_20260311_181312.png>]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 678--678
+ [][]  
+ []
 
-] [27
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[24
 
 ]
-<../plots/value_weight_sweep.png, id=1571, 1084.05pt x 361.35pt>
-File: ../plots/value_weight_sweep.png Graphic file (type png)
-<use ../plots/value_weight_sweep.png>
-Package pdftex.def Info: ../plots/value_weight_sweep.png  used on input line 77
-1.
-(pdftex.def)             Requested size: 391.71698pt x 130.5711pt.
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 681--681
+ [][]  
+ []
+
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[25
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 716--716
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[26
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 756--756
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[27
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 767--767
+ [][]  
+ []
+
+<../plots/ckpt_42516k_curves.png, id=1571, 1149.093pt x 571.53525pt>
+File: ../plots/ckpt_42516k_curves.png Graphic file (type png)
+<use ../plots/ckpt_42516k_curves.png>
+Package pdftex.def Info: ../plots/ckpt_42516k_curves.png  used on input line 76
+7.
+(pdftex.def)             Requested size: 391.71698pt x 194.83394pt.
+
+Overfull \vbox (3.4753pt too high) detected at line 767
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
 
 [28
 
- <../plots/value_weight_sweep.png>] (slides_build.toc) [29
+ <../plots/ckpt_42516k_curves.png>]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 770--770
+ [][]  
+ []
 
-] [30
+(slides_build.toc)
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
 
-] [31
+[29
 
 ]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 806--806
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[30
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 826--826
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[31
+
+]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 852--852
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
 [32
 
 ]
-<../plots/benchmark_dvn_vs_greedy_20260311_123451.png, id=1798, 867.24pt x 361.
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 861--861
+ [][]  
+ []
+
+<../plots/benchmark_dvn_vs_greedy_20260311_123451.png, id=1796, 867.24pt x 361.
 35pt>
 File: ../plots/benchmark_dvn_vs_greedy_20260311_123451.png Graphic file (type p
 ng)
 <use ../plots/benchmark_dvn_vs_greedy_20260311_123451.png>
 Package pdftex.def Info: ../plots/benchmark_dvn_vs_greedy_20260311_123451.png  
-used on input line 865.
+used on input line 861.
 (pdftex.def)             Requested size: 313.37624pt x 130.5711pt.
- [33
 
- <../plots/benchmark_dvn_vs_greedy_20260311_123451.png>] [34
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[33
+
+ <../plots/benchmark_dvn_vs_greedy_20260311_123451.png>]
+Overfull \hbox (40.36427pt too wide) in paragraph at lines 899--899
+ [][]  
+ []
+
+
+Overfull \hbox (40.36427pt too wide) has occurred while \output is active
+ [][]  
+ []
+
+[34
 
 ]
 \tf@nav=\write6
@@ -1398,8 +1729,7 @@ used on input line 865.
 \tf@snm=\write8
 \openout8 = `slides_build.snm'.
 
-
-(slides_build.aux)
+ (slides_build.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
@@ -1408,11 +1738,11 @@ Package rerunfilecheck Info: File `slides_build.out' has not changed.
 (rerunfilecheck)             Checksum: E686ACBDEFAE34E0F84E00337F586B3B;1159.
  ) 
 Here is how much of TeX's memory you used:
- 38454 strings out of 468040
- 911606 string characters out of 5432828
+ 38455 strings out of 468040
+ 911269 string characters out of 5432828
  1540703 words of memory out of 5000000
- 66365 multiletter control sequences out of 15000+600000
- 647912 words of font info for 99 fonts, out of 8000000 for 9000
+ 66366 multiletter control sequences out of 15000+600000
+ 648225 words of font info for 100 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  128i,18n,123p,729b,1062s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/
@@ -1427,32 +1757,32 @@ ppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi8.pfb><C:/Users
 /keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb><
 C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr
 12.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfont
-s/cm/cmr6.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/
-amsfonts/cm/cmr7.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/
-public/amsfonts/cm/cmr8.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts
-/type1/public/amsfonts/cm/cmsy10.pfb><C:/Users/keyva/AppData/Local/Programs/MiK
-TeX/fonts/type1/public/amsfonts/cm/cmsy5.pfb><C:/Users/keyva/AppData/Local/Prog
-rams/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy6.pfb><C:/Users/keyva/AppData/Lo
-cal/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Users/keyva/Ap
-pData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/Users/
-keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.
-pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/s
-fsi1000.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm
--super/sfss0500.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/p
-ublic/cm-super/sfss0600.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts
-/type1/public/cm-super/sfss0700.pfb><C:/Users/keyva/AppData/Local/Programs/MiKT
-eX/fonts/type1/public/cm-super/sfss0800.pfb><C:/Users/keyva/AppData/Local/Progr
-ams/MiKTeX/fonts/type1/public/cm-super/sfss1000.pfb><C:/Users/keyva/AppData/Loc
-al/Programs/MiKTeX/fonts/type1/public/cm-super/sfss1200.pfb><C:/Users/keyva/App
-Data/Local/Programs/MiKTeX/fonts/type1/public/cm-super/sfsx0500.pfb><C:/Users/k
-eyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/sfsx0800.pfb><C:
-/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/sfsx1000
+s/cm/cmr7.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/
+amsfonts/cm/cmr8.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/
+public/amsfonts/cm/cmsy10.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fon
+ts/type1/public/amsfonts/cm/cmsy5.pfb><C:/Users/keyva/AppData/Local/Programs/Mi
+KTeX/fonts/type1/public/amsfonts/cm/cmsy6.pfb><C:/Users/keyva/AppData/Local/Pro
+grams/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Users/keyva/AppData/L
+ocal/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/Users/keyva/A
+ppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:
+/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/sfsi1000
 .pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/
-sfsx1200.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/c
-m-super/sfsx1440.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/
-public/cm-super/sftt1000.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/font
-s/type1/public/cm-super/sftt1200.pfb>
-Output written on slides_build.pdf (34 pages, 5907424 bytes).
+sfss0500.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/c
+m-super/sfss0600.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/
+public/cm-super/sfss0700.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/font
+s/type1/public/cm-super/sfss0800.pfb><C:/Users/keyva/AppData/Local/Programs/MiK
+TeX/fonts/type1/public/cm-super/sfss1000.pfb><C:/Users/keyva/AppData/Local/Prog
+rams/MiKTeX/fonts/type1/public/cm-super/sfss1200.pfb><C:/Users/keyva/AppData/Lo
+cal/Programs/MiKTeX/fonts/type1/public/cm-super/sfsx0500.pfb><C:/Users/keyva/Ap
+pData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/sfsx0800.pfb><C:/Users/
+keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/sfsx1000.pfb><C
+:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super/sfsx120
+0.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/cm-super
+/sfsx1440.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1/public/
+cm-super/sftt0800.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fonts/type1
+/public/cm-super/sftt1000.pfb><C:/Users/keyva/AppData/Local/Programs/MiKTeX/fon
+ts/type1/public/cm-super/sftt1200.pfb>
+Output written on slides_build.pdf (34 pages, 6238395 bytes).
 PDF statistics:
  2039 PDF objects out of 2073 (max. 8388607)
  77 named destinations out of 1000 (max. 500000)
