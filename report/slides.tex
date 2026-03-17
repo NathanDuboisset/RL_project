@@ -379,9 +379,9 @@ DQN treats this as a raw perception problem. We can do better by \textbf{leverag
 \begin{columns}[T]
 \begin{column}{0.58\textwidth}
 \begin{center}
-\includegraphics[width=0.98\textwidth]{../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png}
+\includegraphics[width=0.98\textwidth]{traindqn.png}
 \end{center}
-\footnotesize Same benchmark figure used in the report for 1P performance context.
+\footnotesize DQN training figure (DDQN / Rainbow) from the report assets.
 \end{column}
 
 \begin{column}{0.38\textwidth}
@@ -747,27 +747,19 @@ Optimal $\alpha \in [0.1, 0.5]$ balances immediate reward and value heuristic.
 \end{itemize}
 \end{alertblock}
 
-\vspace{0.3em}
-\begin{block}{Richer Conditioning}
-PPO value $V_\phi(s_{t+3})$ sees full context at terminal state, not isolated afterstate.
-\end{block}
 \end{column}
 \end{columns}
 \end{frame}
 
 %-----------------------------------------------------------------------------
-\begin{frame}{PPO Training Figure: Value Weight Sweep}
+\begin{frame}{PPO Training Curves (Loss)}
 \begin{center}
-\includegraphics[width=0.90\textwidth]{../plots/value_weight_sweep.png}
+\includegraphics[width=0.90\textwidth]{../plots/ckpt_42516k_curves.png}
 \end{center}
 
 \vspace{0.3em}
 \footnotesize
-Sweep over \(\alpha\) in
-\[
-\text{score} = \text{symlog}(R_{t+1:t+3}) + \alpha\,\text{symlog}(V_\phi(s_{t+3}))
-\]
-Best region in the report: \(\alpha \in [0.1, 0.5]\).
+Loss curves from PPO training checkpoints (\texttt{ckpt\_...}).
 \end{frame}
 
 %=============================================================================
