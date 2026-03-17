@@ -147,6 +147,25 @@ Dot, $2\times2$, $3\times3$, Line-3, Line-4, L-small, L-large\\
 \end{frame}
 
 %-----------------------------------------------------------------------------
+\begin{frame}{Block Blast: Example Board}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{block}{1P Example}
+\centering
+\includegraphics[width=0.95\linewidth]{board1p.png}
+\end{block}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{block}{3P Example}
+\centering
+\includegraphics[width=0.95\linewidth]{board3p.png}
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
 \begin{frame}{Environment: Single-Piece Variant (1P)}
 \begin{columns}[T]
 \begin{column}{0.48\textwidth}
@@ -355,6 +374,28 @@ DQN treats this as a raw perception problem. We can do better by \textbf{leverag
 \end{exampleblock}
 \end{frame}
 
+%-----------------------------------------------------------------------------
+\begin{frame}{DQN Training Outcome (from report benchmark)}
+\begin{columns}[T]
+\begin{column}{0.58\textwidth}
+\begin{center}
+\includegraphics[width=0.98\textwidth]{../plots/benchmark_dvn_vs_greedy_vs_random_20260313_230003.png}
+\end{center}
+\footnotesize Same benchmark figure used in the report for 1P performance context.
+\end{column}
+
+\begin{column}{0.38\textwidth}
+\begin{alertblock}{Reading for DQN}
+\begin{itemize}
+    \item DDQN and Rainbow remained around \(\sim 20\) avg steps
+    \item No stable long-game regime after 1,000 episodes
+    \item Confirms underfitting and weak long-horizon credit assignment
+\end{itemize}
+\end{alertblock}
+\end{column}
+\end{columns}
+\end{frame}
+
 %=============================================================================
 \section{Deep Value Network (DVN)}
 
@@ -394,6 +435,19 @@ Environment must expose precomputed afterstates. Our \texttt{placements\_result}
 \end{alertblock}
 \end{column}
 \end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{DVN Training Curves (W\&B)}
+\begin{center}
+\includegraphics[width=0.31\textwidth]{../plots/wandb_reward.png}\hfill
+\includegraphics[width=0.31\textwidth]{../plots/wandb_loss.png}\hfill
+\includegraphics[width=0.31\textwidth]{../plots/wandb_eplen.png}
+\end{center}
+
+\vspace{0.4em}
+\footnotesize
+Left to right: reward, TD loss, and episode length versus training episodes (same figures as the report).
 \end{frame}
 
 %-----------------------------------------------------------------------------
@@ -699,6 +753,21 @@ PPO value $V_\phi(s_{t+3})$ sees full context at terminal state, not isolated af
 \end{block}
 \end{column}
 \end{columns}
+\end{frame}
+
+%-----------------------------------------------------------------------------
+\begin{frame}{PPO Training Figure: Value Weight Sweep}
+\begin{center}
+\includegraphics[width=0.90\textwidth]{../plots/value_weight_sweep.png}
+\end{center}
+
+\vspace{0.3em}
+\footnotesize
+Sweep over \(\alpha\) in
+\[
+\text{score} = \text{symlog}(R_{t+1:t+3}) + \alpha\,\text{symlog}(V_\phi(s_{t+3}))
+\]
+Best region in the report: \(\alpha \in [0.1, 0.5]\).
 \end{frame}
 
 %=============================================================================
