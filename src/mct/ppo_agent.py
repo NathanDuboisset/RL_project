@@ -1,27 +1,3 @@
-"""
-ppo_agent.py
-============
-PPO agent for BlockBlast3PEnv.
-
-Observation keys used:
-  board            (8, 8)     binary grid
-  pieces           (3, 5, 5)  3 current pieces padded to 5×5
-  pieces_used      (3,)       which pieces have been played this round
-  combo            (1,)       current combo counter
-  valid_placements (3, 8, 8)  action mask — used to block illegal actions
-
-Action space: Discrete(192) = piece_idx * 64 + row * 8 + col
-
-Network
--------
-  BoardEncoder  : Conv2d stack  (1, 8, 8)  → 128-d
-  PiecesEncoder : Conv2d stack  (3, 5, 5)  → 64-d
-  ScalarEncoder : MLP           (combo, pieces_used) → 32-d
-  Trunk         : MLP           224-d → 256-d
-  PolicyHead    : Linear 256 → 192  (invalid actions masked to -inf)
-  ValueHead     : Linear 256 → 1
-"""
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -29,41 +5,18 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from collections import deque
 
-# ---------------------------------------------------------------------------
-# Reward transform
-# ---------------------------------------------------------------------------
 
 def symlog(x: np.ndarray) -> np.ndarray:
-    """
-    Symmetric log transform: sign(x) * log(1 + |x|)
-
-    Why not plain log?
-      - Rewards can be negative (-1 for invalid action) -> log undefined
-      - symlog handles all reals and is identity near zero
-
-    Effect on BlockBlast rewards:
-      symlog(0.1)  ~  0.095   small placement
-      symlog(10)   ~  2.40    single clear
-      symlog(300)  ~  5.71    big combo
-      => compresses x3000 range to ~x60, manageable for the value network
-
-    The VALUE network learns to predict symlog(return), not the raw return.
-    This does NOT affect the policy gradient direction (only scales advantages,
-    which are re-normalised anyway).
-    """
+    """sign(x) * log(1 + |x|) — compresses the wide reward range for the value network."""
     return np.sign(x) * np.log1p(np.abs(x))
 
 
 def symexp(y: np.ndarray) -> np.ndarray:
-    """Inverse of symlog. Useful for logging raw reward estimates."""
+    """Inverse of symlog."""
     return np.sign(y) * (np.expm1(np.abs(y)))
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Observation utilities
-# ──────────────────────────────────────────────────────────────────────────────
 
 def obs_to_tensors(obs_batch: dict, device: torch.device) -> dict:
-    """Dict of numpy arrays (with leading batch dim) → dict of float32 tensors."""
     return {
         "board":            torch.as_tensor(obs_batch["board"],            dtype=torch.float32, device=device),
         "pieces":           torch.as_tensor(obs_batch["pieces"],           dtype=torch.float32, device=device),
@@ -74,28 +27,17 @@ def obs_to_tensors(obs_batch: dict, device: torch.device) -> dict:
 
 
 def stack_obs(obs_list: list) -> dict:
-    """Stack a list of single-env obs dicts into a batched obs dict (numpy)."""
     return {k: np.stack([o[k] for o in obs_list], axis=0) for k in obs_list[0]}
 
 
 def valid_to_mask(valid_placements: np.ndarray) -> np.ndarray:
-    """
-    valid_placements: (B, 3, 8, 8) or (3, 8, 8)
-    Returns bool mask (B, 192) — True = legal action.
-    """
     vp = np.asarray(valid_placements)
     if vp.ndim == 3:
         vp = vp[None]
     return vp.reshape(vp.shape[0], -1).astype(bool)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Network modules
-# ──────────────────────────────────────────────────────────────────────────────
-
 class BoardEncoder(nn.Module):
-    """Binary 8×8 board → 128-d feature vector."""
-
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(
@@ -107,13 +49,10 @@ class BoardEncoder(nn.Module):
         )
 
     def forward(self, board: torch.Tensor) -> torch.Tensor:
-        # board: (B, 8, 8)
-        return self.net(board.unsqueeze(1))   # (B, 128)
+        return self.net(board.unsqueeze(1))
 
 
 class PiecesEncoder(nn.Module):
-    """Three 5×5 padded pieces (as 3 channels) → 64-d feature vector."""
-
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(
@@ -124,31 +63,25 @@ class PiecesEncoder(nn.Module):
         )
 
     def forward(self, pieces: torch.Tensor) -> torch.Tensor:
-        # pieces: (B, 3, 5, 5)
-        return self.net(pieces)               # (B, 64)
+        return self.net(pieces)
 
 
 class ScalarEncoder(nn.Module):
-    """combo (normalised) + pieces_used (3 bits) → 32-d."""
-
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(4, 32), nn.ReLU())
 
     def forward(self, combo: torch.Tensor, pieces_used: torch.Tensor) -> torch.Tensor:
-        # combo: (B,1)  pieces_used: (B,3)
-        x = torch.cat([combo / 10.0, pieces_used], dim=-1)  # (B,4)
-        return self.net(x)                                    # (B,32)
+        x = torch.cat([combo / 10.0, pieces_used], dim=-1)
+        return self.net(x)
 
 
 class ActorCritic(nn.Module):
-    """Shared-trunk actor-critic for 192 discrete actions."""
-
     def __init__(self, action_dim: int = 192):
         super().__init__()
-        self.board_enc  = BoardEncoder()    # → 128
-        self.pieces_enc = PiecesEncoder()   # → 64
-        self.scalar_enc = ScalarEncoder()   # → 32
+        self.board_enc  = BoardEncoder()
+        self.pieces_enc = PiecesEncoder()
+        self.scalar_enc = ScalarEncoder()
 
         self.trunk = nn.Sequential(
             nn.Linear(224, 256), nn.ReLU(),
@@ -174,13 +107,9 @@ class ActorCritic(nn.Module):
         b = self.board_enc(obs_t["board"])
         p = self.pieces_enc(obs_t["pieces"])
         s = self.scalar_enc(obs_t["combo"], obs_t["pieces_used"])
-        return self.trunk(torch.cat([b, p, s], dim=-1))   # (B, 256)
+        return self.trunk(torch.cat([b, p, s], dim=-1))
 
-    def forward(
-        self,
-        obs_t: dict,
-        action_mask: torch.Tensor = None,
-    ):
+    def forward(self, obs_t: dict, action_mask: torch.Tensor = None):
         h      = self._encode(obs_t)
         logits = self.policy_head(h)
         values = self.value_head(h).squeeze(-1)
@@ -191,17 +120,13 @@ class ActorCritic(nn.Module):
     @torch.no_grad()
     def get_action(self, obs_t, action_mask=None, deterministic=False):
         logits, values = self.forward(obs_t, action_mask)
-        dist     = Categorical(logits=logits)
-        actions  = logits.argmax(-1) if deterministic else dist.sample()
+        dist    = Categorical(logits=logits)
+        actions = logits.argmax(-1) if deterministic else dist.sample()
         return actions, dist.log_prob(actions), values, dist.entropy()
 
 
-# ---------------------------------------------------------------------------
-# Rollout buffer
-# ---------------------------------------------------------------------------
-
 class RolloutBuffer:
-    """Stores T steps x N envs, then computes GAE advantages and returns."""
+    """Stores T steps × N envs, then computes GAE advantages and returns."""
 
     def __init__(self, n_steps: int, n_envs: int):
         self.T = n_steps
@@ -217,7 +142,7 @@ class RolloutBuffer:
         self.masks       = torch.zeros(T, N, 192, dtype=torch.bool)
         self.actions     = torch.zeros(T, N, dtype=torch.long)
         self.log_probs   = torch.zeros(T, N)
-        self.rewards     = torch.zeros(T, N)   # stores symlog-transformed rewards
+        self.rewards     = torch.zeros(T, N)
         self.values      = torch.zeros(T, N)
         self.dones       = torch.zeros(T, N)
         self.advantages  = None
@@ -231,7 +156,7 @@ class RolloutBuffer:
         self.masks[step]       = masks.cpu()
         self.actions[step]     = actions.cpu()
         self.log_probs[step]   = log_probs.cpu()
-        self.rewards[step]     = rewards.cpu()  # already symlog-transformed
+        self.rewards[step]     = rewards.cpu()
         self.values[step]      = values.cpu()
         self.dones[step]       = dones.cpu()
 
@@ -277,28 +202,7 @@ class RolloutBuffer:
                   log_probs[b].to(device), advantages[b].to(device), returns[b].to(device)
 
 
-# ---------------------------------------------------------------------------
-# PPO Trainer
-# ---------------------------------------------------------------------------
-
 class PPOTrainer:
-    """
-    Parameters
-    ----------
-    envs          : list[BlockBlast3PEnv]
-    device        : torch.device
-    lr            : Adam learning rate
-    n_steps       : rollout steps per env per update
-    n_epochs      : PPO epochs per rollout
-    batch_size    : mini-batch size (flattened T*N)
-    gamma         : discount factor
-    gae_lambda    : GAE lambda
-    clip_eps      : PPO epsilon
-    vf_coef       : value-loss weight
-    ent_coef      : entropy bonus weight
-    max_grad_norm : gradient clipping norm
-    """
-
     def __init__(
         self,
         envs,
@@ -335,7 +239,7 @@ class PPOTrainer:
 
         self.ep_returns  = deque(maxlen=100)
         self.ep_lengths  = deque(maxlen=100)
-        self._ep_ret     = [0.0] * self.n_envs   # raw (untransformed) episode return
+        self._ep_ret     = [0.0] * self.n_envs
         self._ep_len     = [0]   * self.n_envs
         self.total_steps = 0
 
@@ -344,18 +248,10 @@ class PPOTrainer:
             "loss_policy", "loss_value", "entropy", "clip_frac",
         )}
 
-    # -------------------------------------------------------------------------
-    # Env management
-    # -------------------------------------------------------------------------
-
     def _reset_all_envs(self):
         for i, env in enumerate(self.envs):
             obs, _ = env.reset()
             self._obs[i] = obs
-
-    # -------------------------------------------------------------------------
-    # Rollout collection
-    # -------------------------------------------------------------------------
 
     @torch.no_grad()
     def _collect_rollout(self):
@@ -378,7 +274,6 @@ class PPOTrainer:
                 raw_rewards[i] = rew
                 dones[i]       = float(done)
 
-                # track RAW episode return for logging (human-readable)
                 self._ep_ret[i] += rew
                 self._ep_len[i] += 1
 
@@ -391,9 +286,6 @@ class PPOTrainer:
 
                 self._obs[i] = next_obs
 
-            # Apply symlog BEFORE storing in the buffer.
-            # The value network will predict symlog(return), making its
-            # regression problem tractable across the wide reward range.
             transformed_rewards = torch.as_tensor(
                 symlog(raw_rewards), dtype=torch.float32, device=self.device
             )
@@ -406,17 +298,12 @@ class PPOTrainer:
             )
             self.total_steps += self.n_envs
 
-        # Bootstrap value on last obs
         batch   = stack_obs(self._obs)
         obs_t   = obs_to_tensors(batch, self.device)
         mask_np = valid_to_mask(batch["valid_placements"])
         mask_t  = torch.as_tensor(mask_np, device=self.device)
         _, last_values = self.model.forward(obs_t, mask_t)
         self.buffer.compute_returns_and_advantages(last_values, self.gamma, self.gae_lambda)
-
-    # -------------------------------------------------------------------------
-    # PPO update
-    # -------------------------------------------------------------------------
 
     def _ppo_update(self) -> dict:
         self.model.train()
@@ -458,50 +345,31 @@ class PPOTrainer:
             clip_frac=np.mean(clips),
         )
 
-    # -------------------------------------------------------------------------
-    # Checkpoint save / load   (full state for seamless resume)
-    # -------------------------------------------------------------------------
-
     def save(self, path: str):
-        """
-        Save the full trainer state so training can be resumed exactly.
-        Includes: model weights, optimizer state, step counter, history,
-        episode deques, and per-env running accumulators.
-        """
         torch.save({
-            # network
-            "model":        self.model.state_dict(),
-            "optimizer":    self.optimizer.state_dict(),
-            # counters
-            "total_steps":  self.total_steps,
-            # episode tracking
-            "ep_returns":   list(self.ep_returns),
-            "ep_lengths":   list(self.ep_lengths),
-            "_ep_ret":      self._ep_ret,
-            "_ep_len":      self._ep_len,
-            # full training history (for seamless curve continuation)
-            "history":      self.history,
+            "model":       self.model.state_dict(),
+            "optimizer":   self.optimizer.state_dict(),
+            "total_steps": self.total_steps,
+            "ep_returns":  list(self.ep_returns),
+            "ep_lengths":  list(self.ep_lengths),
+            "_ep_ret":     self._ep_ret,
+            "_ep_len":     self._ep_len,
+            "history":     self.history,
         }, path)
         print(f"Saved -> {path}  (step {self.total_steps:,})")
 
     def load(self, path: str):
-        """
-        Restore full trainer state. After load(), call run() or the training
-        loop directly -- no need to reset envs manually.
-        """
         ckpt = torch.load(path, map_location=self.device)
 
         self.model.load_state_dict(ckpt["model"])
         self.optimizer.load_state_dict(ckpt["optimizer"])
         self.total_steps = ckpt["total_steps"]
 
-        # episode tracking
-        self.ep_returns  = deque(ckpt["ep_returns"], maxlen=100)
-        self.ep_lengths  = deque(ckpt["ep_lengths"], maxlen=100)
-        self._ep_ret     = ckpt["_ep_ret"]
-        self._ep_len     = ckpt["_ep_len"]
+        self.ep_returns = deque(ckpt["ep_returns"], maxlen=100)
+        self.ep_lengths = deque(ckpt["ep_lengths"], maxlen=100)
+        self._ep_ret    = ckpt["_ep_ret"]
+        self._ep_len    = ckpt["_ep_len"]
 
-        # history: extend existing lists so curves are continuous
         saved_history = ckpt["history"]
         for k in self.history:
             if k in saved_history:

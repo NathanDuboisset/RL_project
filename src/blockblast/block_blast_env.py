@@ -83,7 +83,6 @@ class BlockBlastEnv(gym.Env):
     
     def _has_free_3x3_square(self, board_state):
         windows = sliding_window_view(board_state, (3, 3))
-        # A free 3x3 exists if any 3x3 window is fully empty.
         return np.any(np.all(windows == 0, axis=(-2, -1)))
 
     def _get_hyp_reward(self, lines_cleared, board_state=None):
@@ -109,7 +108,6 @@ class BlockBlastEnv(gym.Env):
         self._place_piece(self.current_shape_grid, row, col)
         lines_cleared = self._clear_lines()
 
-        # small reward for surviving, bigger reward for clearing lines
         reward = self._get_hyp_reward(lines_cleared)
 
         self._sample_new_piece()
@@ -157,20 +155,12 @@ class BlockBlastEnv(gym.Env):
         return valid_mask
 
     def _get_placements_result(self, shape_grid):
-        """
-        For each possible (row, col) placement, return the resulting board
-        after placing the current piece and clearing lines. If the placement
-        is invalid, the result is an all-blocked grid.
-        """
-        # default: all blocked grids for invalid placements
         results = np.ones(
             (self.grid_size, self.grid_size, self.grid_size, self.grid_size),
             dtype=np.int8,
         )
 
         h, w = shape_grid.shape
-
-        # only positions where the top-left of the shape can fit on the board
         max_row = self.grid_size - h + 1
         max_col = self.grid_size - w + 1
 
@@ -185,15 +175,12 @@ class BlockBlastEnv(gym.Env):
                 board_copy = self.board.copy()
                 board_copy[row : row + h, col : col + w] += shape_grid
 
-                # apply the same clearing logic as in the real env step
                 full_rows = np.all(board_copy == 1, axis=1)
                 full_cols = np.all(board_copy == 1, axis=0)
                 board_copy[full_rows, :] = 0
                 board_copy[:, full_cols] = 0
 
                 results[row, col] = board_copy
-                
-                #apply same reward logic as in the real env step for hypothetical reward calculation
                 lines_cleared = np.sum(full_rows) + np.sum(full_cols)
                 reward = self._get_hyp_reward(lines_cleared, board_copy)
                 rewards[row, col] = reward
@@ -258,7 +245,7 @@ class BlockBlastEnv(gym.Env):
         padded = np.zeros((self.piece_box_size, self.piece_box_size))
         h, w = self.current_shape_grid.shape
         padded[:h, :w] = self.current_shape_grid
-        masked_piece = np.ma.masked_where(padded == 0, padded)  # hide empty cells
+        masked_piece = np.ma.masked_where(padded == 0, padded)
         
         self.ax_piece.imshow(masked_piece, cmap='Oranges', vmin=0, vmax=1)
         self.ax_piece.set_title("Current Piece")

@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 
 class BlockBlastValueNet1P(nn.Module):
-    """
-    CNN
-    """
     def __init__(self):
         super(BlockBlastValueNet1P, self).__init__()
         
@@ -34,9 +31,6 @@ class BlockBlastValueNet1P(nn.Module):
         return out 
     
 class BlockBlastValueNet1Pmultikernel(nn.Module):
-    """
-    CNN more kernels
-    """
     def __init__(self):
         super(BlockBlastValueNet1Pmultikernel, self).__init__()
 
@@ -77,9 +71,6 @@ class BlockBlastValueNet1Pmultikernel(nn.Module):
         return self.fc(features)
 
 class BlockBlastValueNet1PmultikernelFlattenned(nn.Module):
-    """
-    CNN more kernels
-    """
     def __init__(self):
         super(BlockBlastValueNet1PmultikernelFlattenned, self).__init__()
 
@@ -99,7 +90,6 @@ class BlockBlastValueNet1PmultikernelFlattenned(nn.Module):
 
         self.branches = nn.ModuleList([
             nn.Sequential(
-                # Pad with 1 (wall) along each axis before the conv
                 nn.ConstantPad2d((pw, pw, ph, ph), 1.0),
                 nn.Conv2d(1, filter_size, kernel_size=(kh, kw), padding=0),
                 nn.LeakyReLU(),

@@ -81,12 +81,8 @@ def load_dvn_agent(checkpoint_path: Path, device: str) -> DVNAgent1P:
     agent.target_net.eval()
     return agent
 
-# ---------------------------------------------------------------------------
-# Baselines
-# ---------------------------------------------------------------------------
 
 def _compute_immediate_reward(obs: dict, env: BlockBlast3PEnv, action: int) -> float:
-    """Simulate one placement and return its immediate reward."""
     piece_idx = action // (env.grid_size * env.grid_size)
     pos = action % (env.grid_size * env.grid_size)
     row = pos // env.grid_size
@@ -123,10 +119,6 @@ def random_action(obs: dict, rng: np.random.Generator) -> int | None:
         return None
     return int(rng.choice(valid_actions))
 
-
-# ---------------------------------------------------------------------------
-# Evaluation loop
-# ---------------------------------------------------------------------------
 
 def run_policy(
     env: BlockBlast3PEnv,
@@ -186,10 +178,6 @@ def run_policy(
     }
 
 
-# ---------------------------------------------------------------------------
-# Reporting
-# ---------------------------------------------------------------------------
-
 def print_summary(name: str, metrics: dict[str, np.ndarray]) -> None:
     returns = metrics["episode_returns"]
     lengths = metrics["episode_lengths"]
@@ -245,10 +233,6 @@ def save_distribution_plots(
     plt.close(fig)
     return fig_path
 
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     args = parse_args()

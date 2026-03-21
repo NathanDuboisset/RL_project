@@ -8,7 +8,6 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-# Allow running this file directly without requiring editable installation.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
 for path in (PROJECT_ROOT, SRC_ROOT):
@@ -23,7 +22,6 @@ from src.dvn.models import *
 
 
 def _torch_load_compat(path: str, map_location: torch.device) -> dict[str, Any]:
-    """Load torch checkpoints across torch versions."""
     try:
         return torch.load(path, map_location=map_location, weights_only=False)
     except TypeError:
@@ -38,7 +36,6 @@ def _save_training_state(
     iteration: int,
     agent: DVNAgent1P,
 ) -> None:
-    """Save non-model training state for exact resume."""
     Path(state_path).parent.mkdir(parents=True, exist_ok=True)
     state: dict[str, Any] = {
         "episode": episode,
@@ -60,7 +57,6 @@ def _load_training_state(
     *,
     agent: DVNAgent1P,
 ) -> Tuple[int, float, int]:
-    """Restore non-model training state and return resume cursor."""
     state = _torch_load_compat(state_path, map_location=agent.device)
 
     if "optimizer_state_dict" in state:
@@ -88,35 +84,18 @@ def _load_training_state(
 
     return episode + 1, epsilon, iteration
 
-def train_agent(env: BlockBlastEnv, agent: DVNAgent1P, 
-                num_episodes:int, 
-                max_steps_per_episode:int, 
-                eps_start:float, 
-                eps_end:float, 
-                eps_decay:float, 
-                target_update_freq:int, 
-                checkpoint_freq:int, 
-                model_update_freq:int = 1,
+def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
+                num_episodes: int,
+                max_steps_per_episode: int,
+                eps_start: float,
+                eps_end: float,
+                eps_decay: float,
+                target_update_freq: int,
+                checkpoint_freq: int,
+                model_update_freq: int = 1,
                 resume_model_path: Optional[str] = None,
                 resume_state_path: Optional[str] = None,
                 project_name="blockblast-rl", run_name=None):
-    """
-    Boucle d'entraînement formelle pour un agent RL (TD-Learning / Q-Learning).
-    
-    Args:
-        env: L'environnement Gymnasium (ex: BlockBlastEnv).
-        agent: L'agent implémentant select_action, store_transition, update_model, etc.
-        num_episodes (int): Nombre total d'épisodes (trajectoires) à simuler.
-        max_steps_per_episode (int): Sécurité pour éviter les boucles infinies.
-        eps_start (float): Probabilité d'exploration initiale eps.
-        eps_end (float): Borne inférieure de l'exploration.
-        eps_decay (float): Facteur de décroissance géométrique de eps.
-        target_update_freq (int): Fréquence (en épisodes) de synchronisation du réseau cible.
-        checkpoint_freq (int): Fréquence (en épisodes) de sauvegarde des poids theta.
-        resume_model_path (Optional[str]): Chemin d'un checkpoint des poids à recharger.
-        resume_state_path (Optional[str]): Chemin d'un checkpoint d'état d'entraînement à recharger.
-    """
-    
     wandb.init(
         project=project_name,
         name=run_name,
@@ -156,7 +135,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
         )
         print(f"[Resume] start_episode={start_episode}, epsilon={epsilon:.6f}, iteration={iteration}")
 
-    for episode in tqdm(range(start_episode, num_episodes + 1), desc="Entraînement"):
+    for episode in tqdm(range(start_episode, num_episodes + 1), desc="Training"):
         obs, _ = env.reset()
         
         episode_return = 0.0 
@@ -240,7 +219,6 @@ def main():
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
 
-    # To resume, set both paths to the same episode index.
     resume_model_path = None
     resume_state_path = None
 

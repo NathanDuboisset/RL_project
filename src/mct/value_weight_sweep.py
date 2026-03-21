@@ -1,27 +1,3 @@
-"""
-value_weight_sweep.py
-=====================
-Sweep value_weight in MCTSAgent to find the optimal balance between
-the 3-step reward term and the value network term.
-
-Scoring formula:
-    score = symlog(rewards_3_coups) + value_weight * V_symlog(S(t+3))
-
-Both terms in symlog space:
-    symlog(rewards) : 0.26 -> 6.34  (mean ~3.9)
-    V_symlog        : ~14            (biased high but consistent)
-
-Usage (notebook):
-    from mct.value_weight_sweep import run_sweep
-
-    results = run_sweep(
-        model      = trainer.model,
-        env_fn     = lambda: BlockBlast3PEnv(),
-        device     = torch.device("cuda"),
-        n_episodes = 50,
-    )
-"""
-
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -36,23 +12,6 @@ def run_sweep(
     weights: list   = None,
     plot_path: str  = None,
 ) -> dict:
-    """
-    Evaluate MCTSAgent for each value_weight and return a summary.
-
-    Parameters
-    ----------
-    model       : ActorCritic (trained PPO model)
-    env_fn      : callable -> BlockBlast3PEnv
-    device      : torch device
-    n_episodes  : episodes per weight value (more = less noise, more time)
-    weights     : list of value_weight values to test
-                  default: [0.0, 0.05, 0.1, 0.3, 0.5, 1.0]
-    plot_path   : if set, save a bar chart here
-
-    Returns
-    -------
-    dict mapping value_weight -> eval stats dict
-    """
     if weights is None:
         weights = [0.0, 0.05, 0.1, 0.3, 0.5, 1.0]
 
@@ -84,8 +43,7 @@ def run_sweep(
             f"{stats['mean_time_per_round_ms']:>9.1f}"
         )
 
-    # Find best weight
-    best_w = max(results, key=lambda w: results[w]["mean_return"])
+    best_w     = max(results, key=lambda w: results[w]["mean_return"])
     best_stats = results[best_w]
 
     print(f"\n=== Best value_weight : {best_w} ===")
@@ -93,14 +51,12 @@ def run_sweep(
     print(f"  Median return : {best_stats['median_return']:.2f}")
     print(f"  Mean length   : {best_stats['mean_length']:.1f} steps")
 
-    # Plot
     if plot_path:
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         fig.suptitle("MCTS Value Weight Sweep", fontsize=14)
 
         wl = [str(w) for w in weights]
 
-        # Mean return
         means = [results[w]["mean_return"] for w in weights]
         stds  = [results[w]["std_return"]  for w in weights]
         axes[0].bar(wl, means, yerr=stds, capsize=5, color='steelblue', alpha=0.8)
@@ -110,7 +66,6 @@ def run_sweep(
         axes[0].legend()
         axes[0].grid(axis='y', alpha=0.3)
 
-        # Median return
         medians = [results[w]["median_return"] for w in weights]
         axes[1].bar(wl, medians, color='orange', alpha=0.8)
         axes[1].axhline(medians[0], color='red', linestyle='--', alpha=0.5, label='w=0 baseline')
@@ -119,7 +74,6 @@ def run_sweep(
         axes[1].legend()
         axes[1].grid(axis='y', alpha=0.3)
 
-        # Mean length
         lengths = [results[w]["mean_length"] for w in weights]
         axes[2].bar(wl, lengths, color='green', alpha=0.8)
         axes[2].axhline(lengths[0], color='red', linestyle='--', alpha=0.5, label='w=0 baseline')

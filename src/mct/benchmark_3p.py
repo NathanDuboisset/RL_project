@@ -1,31 +1,3 @@
-"""
-benchmark_3p.py
-===============
-Benchmark three planning strategies on BlockBlast3PEnv:
-
-  1. PPO greedy       : policy head argmax at every step, no lookahead
-  2. MCTS first-only  : exhaustive 3-step search, plays only a1 of best triplet,
-                        re-searches at every step (original behaviour)
-  3. MCTS full triplet: exhaustive 3-step search, plays (a1,a2,a3) in order,
-                        re-searches once per round (current behaviour)
-
-Produces:
-  - A summary table printed to stdout
-  - benchmark_results.png : bar charts + episode return distributions
-  - benchmark_episodes.npz : raw per-episode returns and lengths for all 3 configs
-
-Usage (notebook):
-    from mct.benchmark_3p import run_benchmark
-
-    run_benchmark(
-        model     = trainer.model,
-        env_fn    = lambda: BlockBlast3PEnv(),
-        device    = torch.device("cuda"),
-        n_episodes = 100,
-        save_dir  = "/Data/roman.lendormy/rl_checkpoints_2",
-    )
-"""
-
 import time
 import numpy as np
 import torch
@@ -38,12 +10,7 @@ from mct.mcts_agent_first_only import MCTSAgentFirstOnly
 from mct.ppo_agent import obs_to_tensors, valid_to_mask
 
 
-# ---------------------------------------------------------------------------
-# Individual runners
-# ---------------------------------------------------------------------------
-
 def _run_ppo_greedy(model, env_fn, device, n_episodes):
-    """Pure PPO greedy: policy head argmax at every step."""
     model.eval()
     returns, lengths = [], []
 
@@ -122,11 +89,8 @@ def _run_mcts_first_only(model, env_fn, device, n_episodes, gamma, value_weight)
 
     return np.array(returns), np.array(lengths), np.mean(round_times)
 
+
 def _run_mcts_full_triplet(model, env_fn, device, n_episodes, gamma, value_weight):
-    """
-    MCTS full triplet: exhaustive search once per round,
-    plays (a1, a2, a3) in order without re-searching.
-    """
     agent = MCTSAgent(
         model        = model,
         device       = device,
@@ -175,18 +139,7 @@ def _run_mcts_full_triplet(model, env_fn, device, n_episodes, gamma, value_weigh
     return np.array(returns), np.array(lengths), np.mean(round_times)
 
 
-# ---------------------------------------------------------------------------
-# Plotting
-# ---------------------------------------------------------------------------
-
 def _plot_benchmark(results: dict, save_path: str):
-    """
-    Generate a 2×2 figure:
-      - Mean return bar chart with std error bars
-      - Median return bar chart
-      - Mean episode length bar chart
-      - Episode return distributions (violin plot)
-    """
     labels   = list(results.keys())
     colors   = ["steelblue", "darkorange", "forestgreen"]
     x        = np.arange(len(labels))
@@ -200,7 +153,6 @@ def _plot_benchmark(results: dict, save_path: str):
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle("BlockBlast3P — Planning Strategy Benchmark", fontsize=14, fontweight="bold")
 
-    # --- Mean return ---
     bars = axes[0, 0].bar(x, means, yerr=stds, capsize=6,
                            color=colors, alpha=0.85, edgecolor="black", linewidth=0.8)
     axes[0, 0].set_xticks(x)
@@ -212,7 +164,6 @@ def _plot_benchmark(results: dict, save_path: str):
         axes[0, 0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(stds)*0.02,
                         f"{val:.1f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
 
-    # --- Median return ---
     bars = axes[0, 1].bar(x, medians, color=colors, alpha=0.85,
                            edgecolor="black", linewidth=0.8)
     axes[0, 1].set_xticks(x)
@@ -224,7 +175,6 @@ def _plot_benchmark(results: dict, save_path: str):
         axes[0, 1].text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(medians)*0.02,
                         f"{val:.1f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
 
-    # --- Mean episode length ---
     bars = axes[1, 0].bar(x, lengths, color=colors, alpha=0.85,
                            edgecolor="black", linewidth=0.8)
     axes[1, 0].set_xticks(x)
@@ -236,7 +186,6 @@ def _plot_benchmark(results: dict, save_path: str):
         axes[1, 0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(lengths)*0.02,
                         f"{val:.1f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
 
-    # --- Return distribution (violin) ---
     parts = axes[1, 1].violinplot(all_rets, positions=x, showmedians=True, showextrema=True)
     for pc, color in zip(parts["bodies"], colors):
         pc.set_facecolor(color)
@@ -255,10 +204,6 @@ def _plot_benchmark(results: dict, save_path: str):
     print(f"Plot saved -> {save_path}")
 
 
-# ---------------------------------------------------------------------------
-# Main entry point
-# ---------------------------------------------------------------------------
-
 def run_benchmark(
     model,
     env_fn:       Callable,
@@ -268,80 +213,59 @@ def run_benchmark(
     value_weight: float = 0.0,
     save_dir:     str   = ".",
 ) -> dict:
-    """
-    Run all 3 configurations and produce plots + summary.
-
-    Parameters
-    ----------
-    model        : ActorCritic (trained PPO)
-    env_fn       : callable -> BlockBlast3PEnv
-    device       : torch device
-    n_episodes   : episodes per configuration
-    gamma        : discount factor
-    value_weight : value_weight for MCTS scoring (0.0 = pure reward)
-    save_dir     : directory to save plot and .npz
-
-    Returns
-    -------
-    dict with results for all 3 configurations
-    """
     model = model.to(device)
     model.eval()
 
     results = {}
 
-    # --- 1. PPO greedy ---
     print(f"\n{'='*60}")
     print(f"1/3 — PPO Greedy ({n_episodes} episodes)")
     print(f"{'='*60}")
     t0 = time.time()
     rets, lens = _run_ppo_greedy(model, env_fn, device, n_episodes)
     results["PPO Greedy"] = {
-        "returns":      rets,
-        "lengths":      lens,
-        "mean_return":  float(np.mean(rets)),
-        "std_return":   float(np.std(rets)),
-        "median_return":float(np.median(rets)),
-        "mean_length":  float(np.mean(lens)),
-        "time_min":     (time.time() - t0) / 60,
-        "ms_per_round": 0.0,
+        "returns":       rets,
+        "lengths":       lens,
+        "mean_return":   float(np.mean(rets)),
+        "std_return":    float(np.std(rets)),
+        "median_return": float(np.median(rets)),
+        "mean_length":   float(np.mean(lens)),
+        "time_min":      (time.time() - t0) / 60,
+        "ms_per_round":  0.0,
     }
 
-    # --- 2. MCTS first action only ---
     print(f"\n{'='*60}")
     print(f"2/3 — MCTS First Action Only ({n_episodes} episodes)")
     print(f"{'='*60}")
     t0 = time.time()
     rets, lens, ms = _run_mcts_first_only(model, env_fn, device, n_episodes, gamma, value_weight)
     results["MCTS First Only"] = {
-        "returns":      rets,
-        "lengths":      lens,
-        "mean_return":  float(np.mean(rets)),
-        "std_return":   float(np.std(rets)),
-        "median_return":float(np.median(rets)),
-        "mean_length":  float(np.mean(lens)),
-        "time_min":     (time.time() - t0) / 60,
-        "ms_per_round": ms,
+        "returns":       rets,
+        "lengths":       lens,
+        "mean_return":   float(np.mean(rets)),
+        "std_return":    float(np.std(rets)),
+        "median_return": float(np.median(rets)),
+        "mean_length":   float(np.mean(lens)),
+        "time_min":      (time.time() - t0) / 60,
+        "ms_per_round":  ms,
     }
 
-    # --- 3. MCTS full triplet ---
     print(f"\n{'='*60}")
     print(f"3/3 — MCTS Full Triplet ({n_episodes} episodes)")
     print(f"{'='*60}")
     t0 = time.time()
     rets, lens, ms = _run_mcts_full_triplet(model, env_fn, device, n_episodes, gamma, value_weight)
     results["MCTS Full Triplet"] = {
-        "returns":      rets,
-        "lengths":      lens,
-        "mean_return":  float(np.mean(rets)),
-        "std_return":   float(np.std(rets)),
-        "median_return":float(np.median(rets)),
-        "mean_length":  float(np.mean(lens)),
-        "time_min":     (time.time() - t0) / 60,
-        "ms_per_round": ms,
+        "returns":       rets,
+        "lengths":       lens,
+        "mean_return":   float(np.mean(rets)),
+        "std_return":    float(np.std(rets)),
+        "median_return": float(np.median(rets)),
+        "mean_length":   float(np.mean(lens)),
+        "time_min":      (time.time() - t0) / 60,
+        "ms_per_round":  ms,
     }
 
-    # --- Summary table ---
     print(f"\n{'='*60}")
     print(f"BENCHMARK RESULTS — {n_episodes} episodes, value_weight={value_weight}")
     print(f"{'='*60}")
@@ -359,11 +283,9 @@ def run_benchmark(
             f"{r['ms_per_round']:>9.1f} | {delta:>8}"
         )
 
-    # --- Save plot ---
     plot_path = os.path.join(save_dir, "benchmark_3p.png")
     _plot_benchmark(results, plot_path)
 
-    # --- Save raw data ---
     npz_path = os.path.join(save_dir, "benchmark_3p.npz")
     np.savez(npz_path, **{
         f"{k.replace(' ', '_')}_{metric}": v

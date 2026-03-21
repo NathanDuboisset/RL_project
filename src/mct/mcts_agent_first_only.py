@@ -1,38 +1,3 @@
-"""
-mcts_agent.py
-=============
-Round-level exhaustive search agent for BlockBlast3PEnv.
-
-Strategy
---------
-At the start of each round (3 pieces available), enumerate ALL valid
-sequences of 3 placements via env.get_t_plus_3_candidates(). Score each
-terminal state S(t+3) with:
-
-    score = cumulative_reward_3steps + gamma^3 * symexp(V(S(t+3)))
-
-where V is the PPO value network (which predicts symlog-transformed returns,
-so we invert with symexp to get back to the raw reward scale for comparison).
-
-Then play the FIRST action of the best-scoring sequence.
-
-This is not stochastic MCTS -- it is a full depth-3 minimax / best-first
-search, which is exact because the 3 pieces of the current round are known
-and the environment is deterministic within a round.
-
-Complexity per round
---------------------
-  ~50 valid positions per piece * 3! orderings = 6 * 50^3 ~ 750k nodes
-  In practice pruned to << 100k because boards fill up.
-  Each node is cheap: numpy board copy + value network inference (batched).
-
-Public API
-----------
-    agent = MCTSAgent(model, device, gamma=0.99, batch_size=512)
-    action = agent.select_action(env)          # single step
-    stats  = agent.evaluate(env_fn, n=100)     # full eval loop
-"""
-
 import time
 import numpy as np
 import torch
@@ -42,43 +7,21 @@ from typing import Callable
 from mct.ppo_agent import obs_to_tensors, symexp
 
 
-# ---------------------------------------------------------------------------
-# Helper: build a minimal obs dict for the value network from a raw board
-# ---------------------------------------------------------------------------
-
 def _board_to_obs(
     board: np.ndarray,
     pieces_padded: np.ndarray,
     pieces_used: np.ndarray,
     combo: int,
 ) -> dict:
-    """
-    Build the obs dict expected by ActorCritic from raw numpy arrays.
-    All arrays get a leading batch dimension of 1.
-    """
     return {
-        "board":       board[None].astype(np.float32),           # (1,8,8)
-        "pieces":      pieces_padded[None].astype(np.float32),   # (1,3,5,5)
-        "pieces_used": pieces_used[None].astype(np.float32),     # (1,3)
-        "combo":       np.array([[combo]], dtype=np.float32),     # (1,1)
+        "board":       board[None].astype(np.float32),
+        "pieces":      pieces_padded[None].astype(np.float32),
+        "pieces_used": pieces_used[None].astype(np.float32),
+        "combo":       np.array([[combo]], dtype=np.float32),
     }
 
 
-# ---------------------------------------------------------------------------
-# MCTSAgentFirstOnly
-# ---------------------------------------------------------------------------
-
 class MCTSAgentFirstOnly:
-    """
-    Parameters
-    ----------
-    model       : ActorCritic   trained PPO model (used for value estimates)
-    device      : torch.device
-    gamma       : discount factor (should match training gamma)
-    batch_size  : how many S(t+3) states to score in one forward pass
-    verbose     : print timing info per round
-    """
-
     def __init__(
         self,
         model,
@@ -95,10 +38,6 @@ class MCTSAgentFirstOnly:
 
         self.model.eval()
 
-    # -------------------------------------------------------------------------
-    # Value estimation (batched)
-    # -------------------------------------------------------------------------
-
     @torch.no_grad()
     def _value_batch(
         self,
@@ -107,22 +46,12 @@ class MCTSAgentFirstOnly:
         pieces_used: np.ndarray,
         combo: int,
     ) -> np.ndarray:
-        """
-        Estimate V(s) for a batch of boards.
-
-        boards        : (N, 8, 8)  float32
-        pieces_padded : (3, 5, 5)  -- same for all candidates (same round)
-        pieces_used   : (3,)       -- all zeros after a full round
-
-        Returns raw (symexp-inverted) value estimates, shape (N,).
-        """
         N = boards.shape[0]
         values = np.zeros(N, dtype=np.float32)
 
-        # tile the piece/combo info to match the batch
-        pieces_tiled = np.tile(pieces_padded[None], (N, 1, 1, 1))   # (N,3,5,5)
-        used_tiled   = np.tile(pieces_used[None],   (N, 1))          # (N,3)
-        combo_arr    = np.full((N, 1), combo, dtype=np.float32)      # (N,1)
+        pieces_tiled = np.tile(pieces_padded[None], (N, 1, 1, 1))
+        used_tiled   = np.tile(pieces_used[None],   (N, 1))
+        combo_arr    = np.full((N, 1), combo, dtype=np.float32)
 
         for start in range(0, N, self.batch_size):
             end   = min(start + self.batch_size, N)
@@ -132,66 +61,36 @@ class MCTSAgentFirstOnly:
                 "pieces_used": torch.as_tensor(used_tiled[start:end],   device=self.device),
                 "combo":       torch.as_tensor(combo_arr[start:end],    device=self.device),
             }
-            _, v = self.model.forward(obs_b)           # v in symlog space
+            _, v = self.model.forward(obs_b)
             values[start:end] = v.cpu().numpy()
 
-        # invert symlog -> raw value scale
         return symexp(values)
 
-    # -------------------------------------------------------------------------
-    # Core: score all candidates for the current round
-    # -------------------------------------------------------------------------
-
     def _score_candidates(self, env) -> list:
-        """
-        Call env.get_t_plus_3_candidates() and score every terminal state.
-
-        Returns the list of candidates sorted by score descending, each with
-        an added 'score' key.
-        """
         gamma3 = self.gamma ** 3
 
         candidates = env.get_t_plus_3_candidates(self.gamma)
         if not candidates:
             return []
 
-        # Extract terminal boards
         boards = np.stack(
             [c["state_t_plus_3"] for c in candidates], axis=0
-        ).astype(np.float32)   # (N, 8, 8)
+        ).astype(np.float32)
 
-        # After 3 placements the round is over: pieces_used = all ones,
-        # next round pieces are unknown -> use zeros as neutral placeholder.
         pieces_padded = np.zeros((3, 5, 5), dtype=np.float32)
         pieces_used   = np.ones(3,          dtype=np.float32)
-        combo_after   = 0   # combo resets if no clear happened; conservative
+        combo_after   = 0
 
         values = self._value_batch(boards, pieces_padded, pieces_used, combo_after)
 
-        # Final score: discounted 3-step reward + bootstrapped value
         for i, c in enumerate(candidates):
             c["score"] = c["cumulative_reward_3steps"] + gamma3 * float(values[i])
 
         candidates.sort(key=lambda c: c["score"], reverse=True)
         return candidates
 
-    # -------------------------------------------------------------------------
-    # Public: select_action
-    # -------------------------------------------------------------------------
-
     def select_action(self, env) -> int:
-        """
-        Choose the best action for the CURRENT step.
-
-        If candidates are available (full round), picks the first action of
-        the best 3-step sequence.
-        Falls back to a greedy value-based single-step choice if no candidates
-        (e.g. only 1-2 pieces left in the round).
-
-        Returns an integer action in [0, 192).
-        """
         t0 = time.time()
-
         candidates = self._score_candidates(env)
 
         if candidates:
@@ -208,11 +107,9 @@ class MCTSAgentFirstOnly:
                 )
             return int(action)
 
-        # Fallback: greedy single-step (happens mid-round if called directly)
         return self._greedy_fallback(env)
 
     def _greedy_fallback(self, env) -> int:
-        """Value-greedy single-step fallback for mid-round calls."""
         obs = env._get_obs()
         batch = {k: v[None] for k, v in obs.items()
                  if k in ("board", "pieces", "pieces_used", "combo", "valid_placements")}
@@ -228,30 +125,12 @@ class MCTSAgentFirstOnly:
             actions, *_ = self.model.get_action(obs_t, mask_t, deterministic=True)
         return int(actions[0])
 
-    # -------------------------------------------------------------------------
-    # Public: evaluate
-    # -------------------------------------------------------------------------
-
     def evaluate(
         self,
         env_fn: Callable,
         n_episodes: int = 100,
         use_mcts: bool = True,
     ) -> dict:
-        """
-        Run n_episodes and return aggregate stats.
-
-        Parameters
-        ----------
-        env_fn      : callable with no args that returns a fresh env instance
-        n_episodes  : number of episodes to run
-        use_mcts    : if False, falls back to pure PPO greedy (for comparison)
-
-        Returns
-        -------
-        dict with mean_return, std_return, median_return, mean_length,
-             mean_time_per_round_ms
-        """
         returns, lengths, round_times = [], [], []
 
         for ep in range(n_episodes):
@@ -260,19 +139,15 @@ class MCTSAgentFirstOnly:
 
             total_r   = 0.0
             n_steps   = 0
-            round_start = time.time()
 
             while True:
-                # Detect round boundary: all pieces available -> run full search
                 pieces_used = obs["pieces_used"]
 
                 if use_mcts and not np.any(pieces_used):
-                    # Start of a new round: score all 3-step sequences
                     t0     = time.time()
                     action = self.select_action(env)
                     round_times.append((time.time() - t0) * 1000)
                 else:
-                    # Mid-round: just pick the best single step
                     action = self._greedy_fallback(env)
 
                 obs, r, term, trunc, _ = env.step(action)
@@ -294,10 +169,10 @@ class MCTSAgentFirstOnly:
                 )
 
         stats = {
-            "mean_return":          float(np.mean(returns)),
-            "std_return":           float(np.std(returns)),
-            "median_return":        float(np.median(returns)),
-            "mean_length":          float(np.mean(lengths)),
+            "mean_return":            float(np.mean(returns)),
+            "std_return":             float(np.std(returns)),
+            "median_return":          float(np.median(returns)),
+            "mean_length":            float(np.mean(lengths)),
             "mean_time_per_round_ms": float(np.mean(round_times)) if round_times else 0.0,
         }
 
@@ -311,10 +186,6 @@ class MCTSAgentFirstOnly:
         return stats
 
 
-# ---------------------------------------------------------------------------
-# Comparison helper: PPO greedy vs MCTS side by side
-# ---------------------------------------------------------------------------
-
 def compare_ppo_vs_mcts(
     model,
     env_fn: Callable,
@@ -322,21 +193,6 @@ def compare_ppo_vs_mcts(
     n_episodes: int = 100,
     gamma: float = 0.99,
 ) -> dict:
-    """
-    Run the same env_fn n_episodes times with both PPO greedy and MCTS,
-    and print a comparison table.
-
-    Usage (notebook):
-        from mct.mcts_agent import compare_ppo_vs_mcts
-        from block_blast_3p_env import BlockBlast3PEnv
-
-        results = compare_ppo_vs_mcts(
-            model    = trainer.model,
-            env_fn   = lambda: BlockBlast3PEnv(),
-            device   = torch.device("cpu"),
-            n_episodes = 100,
-        )
-    """
     agent = MCTSAgentFirstOnly(model, device=device, gamma=gamma, verbose=False)
 
     print("--- PPO greedy ---")

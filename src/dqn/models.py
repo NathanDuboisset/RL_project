@@ -6,100 +6,84 @@ import math
 class BlockBlastCNNNet(nn.Module):
     def __init__(self, output_size=192):
         super(BlockBlastCNNNet, self).__init__()
-        
-        # board + valid_placements = 1 + 3 channels = 4 channels total for board_conv
+
         self.board_conv = nn.Sequential(
-            nn.Conv2d(4, 32, kernel_size=3, padding=1), # Sortie: 32 x 8 x 8
+            nn.Conv2d(4, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1), # Sortie: 64 x 8 x 8
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Flatten() # Sortie: 64 * 8 * 8 = 4096
+            nn.Flatten()
         )
-        
+
         self.pieces_conv = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, padding=1), # Sortie: 32 x 5 x 5
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Flatten() # Sortie: 32 * 5 * 5 = 800
+            nn.Flatten()
         )
-        
+
         combined_input_dim = 4096 + 800 + 3 + 1
-        
+
         self.fc = nn.Sequential(
             nn.Linear(combined_input_dim, 512),
             nn.ReLU(),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(256, output_size) # Les 192 Q-values
+            nn.Linear(256, output_size)
         )
 
     def forward(self, board, pieces, pieces_used, combo, valid_placements):
-        """
-        We need to give the parameters extracted for the dictionary observation space
-        """
-        x_board = board.unsqueeze(1).float() 
-        x_valid = valid_placements.float()  # (batch_size, 3, 8, 8)
-        
-        # Concatenate board and valid_placements along the channel dimension
-        x_board_combined = torch.cat([x_board, x_valid], dim=1) # (batch_size, 4, 8, 8)
-        
+        x_board = board.unsqueeze(1).float()
+        x_valid = valid_placements.float()
+        x_board_combined = torch.cat([x_board, x_valid], dim=1)
+
         x_pieces = pieces.float()
-        
         board_features = self.board_conv(x_board_combined)
         pieces_features = self.pieces_conv(x_pieces)
 
         x_combo = combo.float().view(-1, 1)
         x_used = pieces_used.float()
 
-        # We combine everything
         combined = torch.cat([board_features, pieces_features, x_used, x_combo], dim=1)
-        
         return self.fc(combined)
     
 class BlockBlastCNNNet1P(nn.Module):
     def __init__(self, output_size=64):
         super(BlockBlastCNNNet1P, self).__init__()
-        
+
         self.board_conv = nn.Sequential(
-            nn.Conv2d(2, 32, kernel_size=3, padding=1), # Sortie: 32 x 8 x 8
+            nn.Conv2d(2, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1), # Sortie: 64 x 8 x 8
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Flatten() # Sortie: 64 * 8 * 8 = 4096
+            nn.Flatten()
         )
-        
+
         self.pieces_conv = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, padding=1), # Sortie: 32 x 5 x 5
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Flatten() # Sortie: 32 * 5 * 5 = 800
+            nn.Flatten()
         )
-        
+
         combined_input_dim = 4096 + 800
-        
+
         self.fc = nn.Sequential(
             nn.Linear(combined_input_dim, 512),
             nn.ReLU(),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(256, output_size) # Les 192 Q-values
+            nn.Linear(256, output_size)
         )
 
     def forward(self, board, pieces, valid_placements):
-        """
-        We need to give the parameters extracted for the dictionary observation space
-        """
         x_valid = valid_placements.unsqueeze(1).float()
-        x_board = board.unsqueeze(1).float() 
-        
-        # Concatenate board and valid_placements along the channel dimension
-        x_board_combined = torch.cat([x_board, x_valid], dim=1) # (batch_size, 4, 8, 8)
-        
+        x_board = board.unsqueeze(1).float()
+        x_board_combined = torch.cat([x_board, x_valid], dim=1)
+
         x_pieces = pieces.unsqueeze(1).float()
         board_features = self.board_conv(x_board_combined)
         pieces_features = self.pieces_conv(x_pieces)
 
-        # We combine everything
         combined = torch.cat([board_features, pieces_features], dim=1)
-        
         return self.fc(combined)
 
 class NoisyLinear(nn.Module):
@@ -157,31 +141,28 @@ class RainbowCNNNet1P(nn.Module):
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Flatten() # 64 * 8 * 8 = 4096
+            nn.Flatten()
         )
-        
+
         self.pieces_conv = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Flatten() # 32 * 5 * 5 = 800
+            nn.Flatten()
         )
-        
+
         combined_input_dim = 4096 + 800
-        
+
         self.shared_fc = nn.Sequential(
             nn.Linear(combined_input_dim, 512),
             nn.ReLU()
         )
-        
-        # Dueling Network Architecture with Noisy Networks
-        # Value stream
+
         self.value_stream = nn.Sequential(
             NoisyLinear(512, 256),
             nn.ReLU(),
             NoisyLinear(256, num_atoms)
         )
-        
-        # Advantage stream
+
         self.advantage_stream = nn.Sequential(
             NoisyLinear(512, 256),
             nn.ReLU(),
@@ -190,29 +171,24 @@ class RainbowCNNNet1P(nn.Module):
 
     def forward(self, board, pieces, valid_placements):
         x_valid = valid_placements.unsqueeze(1).float()
-        x_board = board.unsqueeze(1).float() 
-        x_board_combined = torch.cat([x_board, x_valid], dim=1) # (batch_size, 2, 8, 8)
-        
+        x_board = board.unsqueeze(1).float()
+        x_board_combined = torch.cat([x_board, x_valid], dim=1)
+
         x_pieces = pieces.unsqueeze(1).float()
         board_features = self.board_conv(x_board_combined)
         pieces_features = self.pieces_conv(x_pieces)
 
         combined = torch.cat([board_features, pieces_features], dim=1)
         shared_features = self.shared_fc(combined)
-        
-        # Distributional RL components
+
         value = self.value_stream(shared_features).view(-1, 1, self.num_atoms)
         advantage = self.advantage_stream(shared_features).view(-1, self.action_size, self.num_atoms)
-        
-        # Combine value and advantage: Q(s, a) = V(s) + A(s, a) - mean(A(s, a))
+
         q_dist = value + advantage - advantage.mean(dim=1, keepdim=True)
-        # Apply Softmax to get probabilities (over atoms dimension)
         prob = F.softmax(q_dist, dim=2)
-        
         return prob
-    
+
     def reset_noise(self):
-        """Reset all noisy layers in the network"""
         for module in self.value_stream:
             if hasattr(module, 'reset_noise'):
                 module.reset_noise()

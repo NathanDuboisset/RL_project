@@ -50,10 +50,6 @@ class DVNAgent1P(BaseAgent):
 
 
     def select_action(self, state, epsilon):
-        """
-        Sélectionne l'action maximisant l'équation de Bellman prospective:
-        a* = argmax_a [ r(s,a) + gamma * V(S_after(s,a)) ]
-        """
         valid_mask = state['valid_placements'].flatten()
         valid_actions = np.flatnonzero(valid_mask)
         
@@ -79,16 +75,11 @@ class DVNAgent1P(BaseAgent):
         return valid_actions[best_idx]
 
     def update_model(self):
-        """
-        Minimise l'erreur de différence temporelle (TD Error) par MSE.
-        L(theta) = E [ (Target - V_theta(S_after_t))^2 ]
-        """
         if len(self.memory) < self.batch_size:
             return None
 
         batch = random.sample(self.memory, self.batch_size)
 
-        # --- Current afterstates (single batched forward pass) ---
         current_afterstates = np.empty((self.batch_size, self.grid_size, self.grid_size), dtype=np.float32)
         for i, s in enumerate(batch):
             state, action = s[0], s[1]
@@ -108,8 +99,6 @@ class DVNAgent1P(BaseAgent):
         non_final_indices = np.where(dones_np == 0)[0]
 
         if len(non_final_indices) > 0:
-            # Collect ALL next afterstates across all non-final samples,
-            # then do ONE batched forward pass instead of one per sample.
             all_next_afterstates = []
             all_next_rewards = []
             sample_sizes = []
@@ -159,7 +148,6 @@ class DVNAgent1P(BaseAgent):
         
 
     def save_model(self, path):
-        """Save architecture and weights"""
         torch.save({
             'policy_state_dict': self.policy_net.state_dict(),
             'target_state_dict': self.target_net.state_dict(),
@@ -167,7 +155,6 @@ class DVNAgent1P(BaseAgent):
         }, path)
 
     def load_model(self, path):
-        """Load a saved model from path"""
         checkpoint = torch.load(path)
         self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
         self.target_net.load_state_dict(checkpoint['target_state_dict'])
@@ -175,12 +162,6 @@ class DVNAgent1P(BaseAgent):
 
 
 class RoundPlanner3P:
-    """
-    At the start of each round (3 new pieces), enumerates all possible 3-step
-    sequences via env.get_t_plus_3_candidates(), scores each terminal board
-    with the value network, and queues the best action sequence.
-    """
-
     def __init__(self, gamma: float, agent: DVNAgent1P, eval_batch_size: int = 4096) -> None:
         self.gamma = gamma
         self.agent = agent
@@ -205,8 +186,6 @@ class RoundPlanner3P:
         return int(piece_idx * env.grid_size * env.grid_size + row * env.grid_size + col)
 
     def _build_new_round_plan(self, env: BlockBlast3PEnv) -> list[int] | None:
-        # Fast path: stream 3-step candidates and evaluate in batches to avoid
-        # materializing large Python dict lists from get_t_plus_3_candidates().
         if not all(
             hasattr(env, attr)
             for attr in ("board", "pieces_used", "_valid_positions_for_piece_on_board", "_simulate_one_hyp_step")
@@ -322,7 +301,6 @@ class RoundPlanner3P:
 
         action = self.plan_actions.pop(0)
 
-        # Safety: if the pre-planned action became invalid (rare desync), rebuild
         valid_placements = env.valid_placements
         if valid_placements is None or not valid_placements.reshape(-1)[action]:
             self.plan_actions = []

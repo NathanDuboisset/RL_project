@@ -1,58 +1,3 @@
-"""
-mcts_ppo_trainer.py
-===================
-PPO trainer where MCTS collects the rollouts instead of the greedy policy.
-
-This is the AlphaZero-style training loop:
-  1. MCTS plays each step  ->  higher quality trajectories
-  2. Standard PPO update on those trajectories
-  3. Value network recalibrates continuously on real GAE returns
-  4. Better value network -> better MCTS -> better trajectories -> loop
-
-Key difference from offline fine-tuning
------------------------------------------
-- old_log_probs come from the CURRENT model at collection time
-  -> ratio new/old stays near 1.0, clip fraction stays low
-- Value network updates on fresh GAE returns each rollout
-  -> no distribution shift, no value network drift
-
-Cost
-----
-MCTS takes ~810ms/round. With n_steps=128 and n_envs=4:
-  128 steps / ~35 steps per episode = ~3.6 episodes per env per rollout
-  ~3.6 * 810ms * 4 envs = ~12 minutes per PPO update
-  Recommended: run overnight for 50-100 updates (~10-20M MCTS steps)
-
-Usage (notebook)
-----------------
-    from mct.mcts_ppo_trainer import MCTSPPOTrainer
-    from blockblast.block_blast_3p_env import BlockBlast3PEnv
-    import torch
-
-    envs = [BlockBlast3PEnv() for _ in range(4)]
-
-    trainer = MCTSPPOTrainer(
-        envs   = envs,
-        device = torch.device("cuda"),
-        lr     = 1e-4,
-        n_steps     = 128,
-        n_epochs    = 4,
-        batch_size  = 256,
-        ent_coef    = 0.01,
-        vf_coef     = 0.25,
-        gae_lambda  = 0.98,
-    )
-    trainer.load("/Data/roman.lendormy/rl_checkpoints_2/ckpt_42516k.pt")
-    trainer.model = trainer.model.to(torch.device("cuda"))
-
-    trainer.train(
-        total_timesteps  = 5_000_000,
-        log_interval     = 1,        # log every update (they're slow)
-        checkpoint_every = 500_000,
-        checkpoint_dir   = "/Data/roman.lendormy/rl_checkpoints_2/mcts_ppo",
-    )
-"""
-
 import time
 import numpy as np
 import torch
@@ -66,20 +11,14 @@ from mct.mcts_agent import MCTSAgent
 
 
 class MCTSPPOTrainer(PPOTrainer):
-    """
-    Subclass of PPOTrainer that replaces _collect_rollout with MCTS-guided
-    rollout collection. Everything else (PPO update, save/load, history) is
-    inherited unchanged.
-    """
+    """PPOTrainer that uses MCTS at round boundaries instead of pure greedy rollouts."""
 
     def __init__(self, *args, mcts_gamma: float = 0.99, **kwargs):
         super().__init__(*args, **kwargs)
-        # MCTS agent is built lazily on first rollout (model must be on device)
         self._mcts_agent = None
         self.mcts_gamma  = mcts_gamma
 
     def _get_mcts_agent(self) -> MCTSAgent:
-        """Lazy init — ensures model is on the right device before building."""
         if self._mcts_agent is None:
             self._mcts_agent = MCTSAgent(
                 model      = self.model,
@@ -90,17 +29,8 @@ class MCTSPPOTrainer(PPOTrainer):
             )
         return self._mcts_agent
 
-    # -------------------------------------------------------------------------
-    # MCTS rollout — replaces PPOTrainer._collect_rollout
-    # -------------------------------------------------------------------------
-
     @torch.no_grad()
     def _collect_rollout(self):
-        """
-        Collect n_steps per env using MCTS at round boundaries and greedy
-        fallback mid-round. Store (obs, action, log_prob, value, reward, done)
-        in the buffer exactly as the standard PPO rollout does.
-        """
         self.model.eval()
         agent = self._get_mcts_agent()
 
@@ -109,20 +39,13 @@ class MCTSPPOTrainer(PPOTrainer):
             dones       = np.zeros(self.n_envs, dtype=np.float32)
             actions_np  = np.zeros(self.n_envs, dtype=np.int64)
 
-            # --- Choose actions ---
-            # MCTS at round start, greedy mid-round
             for i, env in enumerate(self.envs):
                 obs_i = self._obs[i]
                 if not np.any(obs_i["pieces_used"]):
-                    # Round boundary: full MCTS search
                     actions_np[i] = agent.select_action(env)
                 else:
-                    # Mid-round: greedy single step (fast)
                     actions_np[i] = agent._greedy_fallback(env)
 
-            # --- Get log_probs and values from current model ---
-            # We need these for the PPO ratio and GAE computation.
-            # Use the model's own evaluation of the chosen actions.
             batch  = stack_obs(self._obs)
             obs_t  = obs_to_tensors(batch, self.device)
             mask_np = valid_to_mask(batch["valid_placements"])
@@ -135,7 +58,6 @@ class MCTSPPOTrainer(PPOTrainer):
             dist      = Categorical(logits=logits)
             log_probs = dist.log_prob(actions_t)
 
-            # --- Step environments ---
             for i, env in enumerate(self.envs):
                 next_obs, rew, term, trunc, _ = env.step(int(actions_np[i]))
                 done = term or trunc
@@ -154,7 +76,6 @@ class MCTSPPOTrainer(PPOTrainer):
 
                 self._obs[i] = next_obs
 
-            # symlog transform before storing (matches training)
             transformed_rewards = torch.as_tensor(
                 symlog(raw_rewards), dtype=torch.float32, device=self.device
             )
@@ -167,17 +88,12 @@ class MCTSPPOTrainer(PPOTrainer):
             )
             self.total_steps += self.n_envs
 
-        # Bootstrap value on last obs
         batch   = stack_obs(self._obs)
         obs_t   = obs_to_tensors(batch, self.device)
         mask_np = valid_to_mask(batch["valid_placements"])
         mask_t  = torch.as_tensor(mask_np, device=self.device)
         _, last_values = self.model.forward(obs_t, mask_t)
         self.buffer.compute_returns_and_advantages(last_values, self.gamma, self.gae_lambda)
-
-    # -------------------------------------------------------------------------
-    # Training loop with checkpointing
-    # -------------------------------------------------------------------------
 
     def train(
         self,
@@ -210,9 +126,9 @@ class MCTSPPOTrainer(PPOTrainer):
             elapsed = time.time() - t0
 
             if upd % log_interval == 0 or upd == 1:
-                mr  = float(np.mean(self.ep_returns))  if self.ep_returns else 0.0
-                mdr = float(np.median(self.ep_returns)) if self.ep_returns else 0.0
-                ml  = float(np.mean(self.ep_lengths))  if self.ep_lengths else 0.0
+                mr  = float(np.mean(self.ep_returns))   if self.ep_returns else 0.0
+                mdr = float(np.median(self.ep_returns))  if self.ep_returns else 0.0
+                ml  = float(np.mean(self.ep_lengths))   if self.ep_lengths else 0.0
 
                 self.history["steps"].append(self.total_steps)
                 self.history["mean_return"].append(mr)
@@ -229,7 +145,6 @@ class MCTSPPOTrainer(PPOTrainer):
                     f"{m['entropy']:>8.4f} | {m['clip_frac']:>7.3f} | {elapsed:>6.0f}s"
                 )
 
-            # Checkpoint
             if self.total_steps - last_ckpt >= checkpoint_every:
                 tag  = f"{self.total_steps // 1000}k"
                 path = os.path.join(checkpoint_dir, f"ckpt_{tag}.pt")
@@ -237,7 +152,6 @@ class MCTSPPOTrainer(PPOTrainer):
                 self._plot_curves(checkpoint_dir, tag)
                 last_ckpt = self.total_steps
 
-        # Final save
         final_path = os.path.join(checkpoint_dir, "ckpt_final.pt")
         self.save(final_path)
         self._plot_curves(checkpoint_dir, "final")

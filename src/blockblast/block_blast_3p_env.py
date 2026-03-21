@@ -35,7 +35,6 @@ class BlockBlast3PEnv(gym.Env):
         self.piece_box_size = 5
         self.n_pieces = 3
 
-        # piece_idx * 64 + position
         self.action_space = spaces.Discrete(self.n_pieces * self.grid_size * self.grid_size)
 
         self.observation_space = spaces.Dict({
@@ -138,7 +137,6 @@ class BlockBlast3PEnv(gym.Env):
         return {}
 
     def _valid_positions_for_piece_on_board(self, board, piece_idx):
-        """Compute valid (row, col) mask for one piece on a provided board."""
         shape_grid = self.pieces_grids[piece_idx]
         h, w = shape_grid.shape
         valid_mask = np.zeros((self.grid_size, self.grid_size), dtype=np.int8)
@@ -149,7 +147,6 @@ class BlockBlast3PEnv(gym.Env):
         return valid_mask
 
     def _simulate_one_hyp_step(self, board, combo, piece_idx, row, col):
-        """Apply one hypothetical placement and return (next_board, reward, next_combo)."""
         shape_grid = self.pieces_grids[piece_idx]
         h, w = shape_grid.shape
 
@@ -171,16 +168,7 @@ class BlockBlast3PEnv(gym.Env):
         return next_board, float(reward), int(next_combo)
 
     def get_t_plus_3_candidates(self, gamma):
-        """
-        Return all possible S_(t+3) states and discounted 3-step rewards.
-
-        Enumerates all 3! piece orders and all valid placements for each order.
-        Output item fields:
-        - state_t_plus_3: np.ndarray (8, 8)
-        - cumulative_reward_3steps: r_t + gamma*r_t+1 + gamma^2*r_t+2
-        - order: tuple of piece indices
-        - actions: ((piece,row,col), (piece,row,col), (piece,row,col))
-        """
+        """Enumerate all valid 3-step sequences and return discounted cumulative rewards."""
         if self.board is None or self.pieces_grids is None or self.pieces_used is None:
             return []
 
@@ -249,11 +237,6 @@ class BlockBlast3PEnv(gym.Env):
             self.valid_placements[i, :self.grid_size - h + 1, :self.grid_size - w + 1] = (~overlaps).astype(np.int8)
 
     def _get_all_placements_result(self):
-        """
-        For each piece and each possible (row, col) placement, return the
-        resulting board after placing the piece and clearing lines.
-        Invalid placements (including used pieces) get an all-blocked grid.
-        """
         results = np.ones(
             (self.n_pieces, self.grid_size, self.grid_size, self.grid_size, self.grid_size),
             dtype=np.int8,
@@ -261,7 +244,6 @@ class BlockBlast3PEnv(gym.Env):
 
         for i in range(self.n_pieces):
             if self.pieces_used[i]:
-                # keep default all-blocked grids
                 continue
 
             shape_grid = self.pieces_grids[i]
@@ -376,7 +358,7 @@ class BlockBlast3PEnv(gym.Env):
         self.fig.canvas.draw()
         rgba = np.asarray(self.fig.canvas.buffer_rgba())
         rgb_array = rgba[..., :3]
-        plt.close(self.fig)  # avoids duplicate plots in Jupyter
+        plt.close(self.fig)  # avoids duplicate plots in jupyter
         self.fig = None
         return rgb_array
 
