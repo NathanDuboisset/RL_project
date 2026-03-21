@@ -1,32 +1,3 @@
-"""
-ppo_finetune.py
-===============
-Fine-tune PPO on MCTS-generated trajectories.
-
-Unlike Behavioral Cloning, this uses the full PPO update (clipped PG +
-value loss + entropy bonus) on the MCTS dataset. The key difference from
-BC is that we compute GAE advantages from the dataset rewards, so the
-value network is updated correctly alongside the policy.
-
-Pipeline
---------
-1. Load the MCTS dataset (.npz from mcts_collect.py)
-2. Reconstruct full episodes and compute GAE returns/advantages
-3. Run PPO updates (same loss as training, just on offline data)
-4. Evaluate before/after to confirm improvement
-
-Usage (notebook)
-----------------
-    from mct.ppo_finetune import ppo_finetune_on_mcts
-
-    history = ppo_finetune_on_mcts(
-        trainer      = trainer,
-        dataset_path = "/Data/roman.lendormy/rl_checkpoints_2/mcts_dataset.npz",
-        save_path    = "/Data/roman.lendormy/rl_checkpoints_2/ppo_mcts_ft.pt",
-        device       = torch.device("cuda"),
-    )
-"""
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -38,10 +9,6 @@ from collections import defaultdict
 from mct.ppo_agent import symlog
 
 
-# ---------------------------------------------------------------------------
-# GAE computation on offline dataset
-# ---------------------------------------------------------------------------
-
 def compute_gae(
     rewards:    np.ndarray,
     values:     np.ndarray,
@@ -49,12 +16,6 @@ def compute_gae(
     gamma:      float = 0.99,
     gae_lambda: float = 0.98,
 ) -> tuple:
-    """
-    Compute GAE advantages and returns on a flat sequence of steps.
-
-    rewards, values, dones : (N,) float32
-    Returns: advantages (N,), returns (N,)
-    """
     N = len(rewards)
     advantages = np.zeros(N, dtype=np.float32)
     last_gae   = 0.0
@@ -68,10 +29,6 @@ def compute_gae(
     returns = advantages + values
     return advantages, returns
 
-
-# ---------------------------------------------------------------------------
-# Main fine-tuning function
-# ---------------------------------------------------------------------------
 
 def ppo_finetune_on_mcts(
     trainer,
@@ -89,41 +46,19 @@ def ppo_finetune_on_mcts(
     max_grad_norm:  float = 0.5,
     plot_path:      str   = None,
 ):
-    """
-    Fine-tune PPO on MCTS trajectories using the standard PPO loss.
-
-    Parameters
-    ----------
-    trainer       : PPOTrainer (modified in-place)
-    dataset_path  : .npz file from mcts_collect.py
-    save_path     : where to save the fine-tuned checkpoint
-    device        : torch device
-    n_epochs      : passes over the dataset
-    batch_size    : mini-batch size
-    lr            : learning rate (lower than PPO training lr)
-    gamma         : discount factor
-    gae_lambda    : GAE lambda
-    clip_eps      : PPO clipping epsilon
-    vf_coef       : value loss coefficient
-    ent_coef      : entropy bonus coefficient
-    max_grad_norm : gradient clipping
-    plot_path     : if set, save loss curves here
-    """
-    # --- Load dataset ---
     print(f"Loading dataset from {dataset_path}...")
     data = np.load(dataset_path)
 
-    boards      = data["boards"]       # (N, 8, 8)
-    pieces      = data["pieces"]       # (N, 3, 5, 5)
-    pieces_used = data["pieces_used"]  # (N, 3)
-    combos      = data["combos"]       # (N, 1)
-    masks       = data["valid_masks"]  # (N, 192)
-    actions     = data["actions"]      # (N,)
+    boards      = data["boards"]
+    pieces      = data["pieces"]
+    pieces_used = data["pieces_used"]
+    combos      = data["combos"]
+    masks       = data["valid_masks"]
+    actions     = data["actions"]
 
     N = len(actions)
     print(f"  {N:,} steps loaded")
 
-    # --- Compute value estimates on the dataset (no grad) ---
     print("Computing value estimates...")
     model = trainer.model.to(device)
     model.eval()
@@ -143,7 +78,6 @@ def ppo_finetune_on_mcts(
             _, v   = model.forward(obs_b, action_mask=mask_b)
             all_values[start:end] = v.cpu().numpy()
 
-    # --- Compute old log probs (for PPO ratio) ---
     print("Computing old log probabilities...")
     all_old_logprobs = np.zeros(N, dtype=np.float32)
 
@@ -162,24 +96,16 @@ def ppo_finetune_on_mcts(
             dist      = Categorical(logits=logits)
             all_old_logprobs[start:end] = dist.log_prob(acts_b).cpu().numpy()
 
-    # --- Load real rewards and dones from dataset ---
-    print("Loading real rewards and dones...")
-    raw_rewards = data["rewards"]   # (N,) true env rewards
-    dones       = data["dones"]     # (N,) episode boundaries
-
-    # Apply symlog so scale matches what the value network was trained on
+    raw_rewards = data["rewards"]
+    dones       = data["dones"]
     transformed_rewards = symlog(raw_rewards)
 
-    # --- Compute GAE advantages using real rewards ---
     print("Computing GAE advantages...")
     advantages, returns = compute_gae(
         transformed_rewards, all_values, dones, gamma, gae_lambda
     )
-
-    # Normalize advantages
     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-    # --- PPO fine-tuning loop ---
     ft_optimizer = torch.optim.Adam(model.parameters(), lr=lr, eps=1e-5)
     history      = defaultdict(list)
 
@@ -235,7 +161,6 @@ def ppo_finetune_on_mcts(
             vf_losses.append(vf_loss.item())
             entropies.append(entropy.item())
 
-            # Agreement with MCTS actions
             acc = (logits.argmax(-1) == acts_b).float().mean().item()
             accs.append(acc)
 
@@ -256,11 +181,9 @@ def ppo_finetune_on_mcts(
             f"{mean_ent:>9.4f} | {mean_cf:>9.3f} | {mean_acc*100:>8.1f}%"
         )
 
-    # --- Save ---
     trainer.save(save_path)
     print(f"\nFine-tuned checkpoint saved -> {save_path}")
 
-    # --- Plot ---
     if plot_path:
         fig, axes = plt.subplots(1, 3, figsize=(14, 4))
 

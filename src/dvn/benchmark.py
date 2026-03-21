@@ -18,11 +18,7 @@ from src.dvn.models import BlockBlastValueNet1PmultikernelFlattenned
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Benchmark DVN vs greedy on BlockBlast 1P and compare reward/episode length distributions."
-        )
-    )
+    parser = argparse.ArgumentParser(description="Benchmark DVN vs greedy vs random on BlockBlast 1P")
     parser.add_argument(
         "--checkpoint",
         type=str,

@@ -1,20 +1,3 @@
-"""
-train.py
-========
-Entry point for PPO training on BlockBlast3PEnv.
-
-Works both as a script and imported in a Jupyter notebook:
-
-  # ── In a notebook cell ──────────────────────────────────────
-  from train import TrainConfig, run
-
-  cfg = TrainConfig(steps=500_000, n_envs=8, device="cuda")
-  trainer, history = run(cfg)
-
-  # ── As a CLI script ─────────────────────────────────────────
-  python train.py --steps 2_000_000 --n_envs 8 --device cuda
-  python train.py --steps 1_000_000 --load ppo_blockblast.pt
-"""
 import os
 import time
 from dataclasses import dataclass, field
@@ -28,25 +11,13 @@ from blockblast import BlockBlast3PEnv
 from mct.ppo_agent import PPOTrainer, obs_to_tensors, valid_to_mask
 
 
-
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
 @dataclass
 class TrainConfig:
-    # training
-    steps:            int   = 50_000     # total environment steps
-    n_envs:           int   = 4          # parallel environments
-    n_steps:          int   = 128        # rollout steps per env per update
-    epochs:           int   = 4          # PPO epochs per rollout
-    batch:            int   = 256        # mini-batch size (flattened)
-    # optimiser
+    steps:            int   = 50_000
+    n_envs:           int   = 4
+    n_steps:          int   = 128
+    epochs:           int   = 4
+    batch:            int   = 256
     lr:               float = 3e-4
     gamma:            float = 0.99
     gae_lambda:       float = 0.95
@@ -54,21 +25,15 @@ class TrainConfig:
     vf_coef:          float = 0.5
     ent_coef:         float = 0.01
     grad_norm:        float = 0.5
-    # misc
-    device:           str   = "cpu"               # "cpu" | "cuda" | "mps"
-    save:             str   = "ppo_blockblast.pt" # final checkpoint path
-    load:             str   = None                # resume from this checkpoint
-    log_interval:     int   = 10                  # console log every N updates
-    eval_eps:         int   = 20                  # greedy eval episodes (0=skip)
+    device:           str   = "cpu"
+    save:             str   = "ppo_blockblast.pt"
+    load:             str   = None
+    log_interval:     int   = 10
+    eval_eps:         int   = 20
     plot:             str   = "training_curves.png"
-    # periodic checkpoints
-    checkpoint_every: int   = 0                   # save every N env steps (0=off)
-    checkpoint_dir:   str   = "/Data/roman.lendormy/rl_checkpoints"       # directory for snapshots
+    checkpoint_every: int   = 0
+    checkpoint_dir:   str   = "/Data/roman.lendormy/rl_checkpoints"
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def make_envs(n: int):
     return [BlockBlast3PEnv() for _ in range(n)]
@@ -80,22 +45,13 @@ def smooth(x, w: int = 5):
     return np.convolve(x, np.ones(w) / w, mode="valid")
 
 
-def plot_history(
-    history: dict,
-    save_path: str = "training_curves.png",
-    title_suffix: str = "",
-):
-    """
-    Plot all 6 training metrics and save to disk.
-    Pass title_suffix to annotate checkpoint plots, e.g. " @ 200k steps".
-    """
+def plot_history(history: dict, save_path: str = "training_curves.png", title_suffix: str = ""):
     steps = np.array(history["steps"])
     if len(steps) == 0:
         return
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 8))
-    title = "PPO -- BlockBlast3P" + title_suffix
-    fig.suptitle(title, fontsize=15, fontweight="bold")
+    fig.suptitle("PPO -- BlockBlast3P" + title_suffix, fontsize=15, fontweight="bold")
 
     panels = [
         (axes[0, 0], "Mean Episode Return",  "mean_return",  "steelblue"),
@@ -122,7 +78,6 @@ def plot_history(
 
 
 def evaluate(trainer: PPOTrainer, n_episodes: int = 20) -> dict:
-    """Run the greedy policy for n_episodes and return aggregate stats."""
     env = BlockBlast3PEnv()
     returns, lengths = [], []
 
@@ -154,34 +109,22 @@ def evaluate(trainer: PPOTrainer, n_episodes: int = 20) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Checkpoint callback
-# ---------------------------------------------------------------------------
-
 class CheckpointCallback:
-    """
-    Called from inside the training loop every time a new update is logged.
-    Saves a .pt checkpoint and a curve snapshot whenever the step counter
-    crosses a multiple of cfg.checkpoint_every.
-    """
-
     def __init__(self, cfg: TrainConfig):
-        self.cfg              = cfg
-        self.every            = cfg.checkpoint_every
-        self.directory        = cfg.checkpoint_dir
-        self._last_ckpt_step  = 0   # tracks the last step we checkpointed at
+        self.cfg             = cfg
+        self.every           = cfg.checkpoint_every
+        self.directory       = cfg.checkpoint_dir
+        self._last_ckpt_step = 0
 
         if self.every > 0:
             os.makedirs(self.directory, exist_ok=True)
             print(f"Checkpointing every {self.every:,} steps -> {self.directory}/")
 
     def maybe_checkpoint(self, trainer: PPOTrainer, history: dict):
-        """Call after every logged update. Saves if threshold crossed."""
         if self.every <= 0:
             return
 
         current = trainer.total_steps
-        # how many full multiples of `every` have we crossed since last ckpt?
         if current - self._last_ckpt_step >= self.every:
             self._last_ckpt_step = (current // self.every) * self.every
             self._save(trainer, history, current)
@@ -190,34 +133,19 @@ class CheckpointCallback:
         tag  = f"{step // 1000}k"
         stem = os.path.join(self.directory, f"ckpt_{tag}")
 
-        # model weights
         ckpt_path = stem + ".pt"
         trainer.save(ckpt_path)
 
-        # curve snapshot
         plot_path = stem + "_curves.png"
         plot_history(history, save_path=plot_path, title_suffix=f" @ {tag} steps")
 
         print(f"[checkpoint @ {step:,}]  model -> {ckpt_path}  |  plot -> {plot_path}")
 
 
-# ---------------------------------------------------------------------------
-# Main run() function  (notebook-friendly)
-# ---------------------------------------------------------------------------
-
 def run(cfg: TrainConfig = None) -> tuple:
-    """
-    Train a PPO agent with the given config.
-
-    Returns
-    -------
-    trainer : PPOTrainer   -- trained model, can be used for inference
-    history : dict         -- full training history for plotting
-    """
     if cfg is None:
         cfg = TrainConfig()
 
-    # resolve device
     if cfg.device == "cuda" and not torch.cuda.is_available():
         print("CUDA not available, falling back to CPU.")
         cfg.device = "cpu"
@@ -248,9 +176,7 @@ def run(cfg: TrainConfig = None) -> tuple:
     if cfg.load:
         trainer.load(cfg.load)
 
-    # ---- training loop with checkpoint hook --------------------------------
-
-    n_updates    = cfg.steps // (cfg.n_steps * cfg.n_envs)
+    n_updates     = cfg.steps // (cfg.n_steps * cfg.n_envs)
     steps_per_upd = cfg.n_steps * cfg.n_envs
 
     trainer._reset_all_envs()
@@ -270,9 +196,9 @@ def run(cfg: TrainConfig = None) -> tuple:
         m = trainer._ppo_update()
 
         if upd % cfg.log_interval == 0 or upd == 1:
-            mr  = float(np.mean(trainer.ep_returns))  if trainer.ep_returns else 0.0
-            mdr = float(np.median(trainer.ep_returns)) if trainer.ep_returns else 0.0
-            ml  = float(np.mean(trainer.ep_lengths))  if trainer.ep_lengths else 0.0
+            mr  = float(np.mean(trainer.ep_returns))   if trainer.ep_returns else 0.0
+            mdr = float(np.median(trainer.ep_returns))  if trainer.ep_returns else 0.0
+            ml  = float(np.mean(trainer.ep_lengths))   if trainer.ep_lengths else 0.0
 
             trainer.history["steps"].append(trainer.total_steps)
             trainer.history["mean_return"].append(mr)
@@ -289,22 +215,17 @@ def run(cfg: TrainConfig = None) -> tuple:
                 f"{m['entropy']:>8.4f} | {m['clip_frac']:>7.3f}"
             )
 
-            # checkpoint hook: runs after every logged update
             ckpt_cb.maybe_checkpoint(trainer, trainer.history)
 
     history = trainer.history
     elapsed = time.time() - t0
     print(f"\nFinished in {elapsed:.1f}s  ({trainer.total_steps / elapsed:,.0f} steps/s)")
 
-    # ---- final save & plot -------------------------------------------------
-
     if cfg.save:
         trainer.save(cfg.save)
 
     if history["steps"] and cfg.plot:
         plot_history(history, save_path=cfg.plot)
-
-    # ---- optional greedy eval ----------------------------------------------
 
     if cfg.eval_eps > 0:
         print(f"\nEvaluating greedy policy over {cfg.eval_eps} episodes ...")
@@ -317,10 +238,6 @@ def run(cfg: TrainConfig = None) -> tuple:
 
     return trainer, history
 
-
-# ---------------------------------------------------------------------------
-# CLI shim  (only active when run as  python train.py ...)
-# ---------------------------------------------------------------------------
 
 def _parse_cli() -> TrainConfig:
     import argparse

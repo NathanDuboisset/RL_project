@@ -1,28 +1,3 @@
-"""
-mcts_collect.py
-===============
-Generate a behavioral cloning dataset by running MCTS for N episodes
-and recording every (obs, action) pair.
-
-Saved as a .npz file with keys:
-  boards        : (N_steps, 8, 8)       float32
-  pieces        : (N_steps, 3, 5, 5)    float32
-  pieces_used   : (N_steps, 3)          float32
-  combos        : (N_steps, 1)          float32
-  valid_masks   : (N_steps, 192)        bool
-  actions       : (N_steps,)            int64   <- MCTS-chosen actions
-
-Usage (notebook):
-    from mct.mcts_collect import collect_mcts_dataset
-    collect_mcts_dataset(
-        trainer      = trainer,
-        env_fn       = lambda: BlockBlast3PEnv(),
-        n_episodes   = 1000,
-        save_path    = "/Data/roman.lendormy/rl_checkpoints/mcts_dataset.npz",
-        device       = torch.device("cuda"),
-    )
-"""
-
 import time
 import numpy as np
 import torch
@@ -38,18 +13,6 @@ def collect_mcts_dataset(
     device          = torch.device("cuda"),
     gamma: float    = 0.99,
 ):
-    """
-    Run MCTS for n_episodes and record every (obs, action) pair.
-
-    Parameters
-    ----------
-    trainer     : PPOTrainer  (needs trainer.model)
-    env_fn      : callable()  -> BlockBlast3PEnv instance
-    n_episodes  : number of MCTS episodes to run
-    save_path   : where to save the .npz dataset
-    device      : torch device for value network inference
-    gamma       : discount factor (should match training)
-    """
     agent = MCTSAgent(
         model      = trainer.model,
         device     = device,
@@ -58,7 +21,6 @@ def collect_mcts_dataset(
         verbose    = False,
     )
 
-    # Accumulators
     all_boards      = []
     all_pieces      = []
     all_pieces_used = []
@@ -81,16 +43,14 @@ def collect_mcts_dataset(
         ep_len = 0
 
         while True:
-            # Record obs BEFORE action
             all_boards.append(obs["board"].astype(np.float32))
             all_pieces.append(obs["pieces"].astype(np.float32))
             all_pieces_used.append(obs["pieces_used"].astype(np.float32))
             all_combos.append(obs["combo"].astype(np.float32))
 
-            mask = valid_to_mask(obs["valid_placements"][None])[0]  # (192,)
+            mask = valid_to_mask(obs["valid_placements"][None])[0]
             all_masks.append(mask)
 
-            # MCTS or greedy depending on round state
             if not np.any(obs["pieces_used"]):
                 action = agent.select_action(env)
             else:
@@ -112,10 +72,9 @@ def collect_mcts_dataset(
         ep_lengths.append(ep_len)
         env.close()
 
-        # Progress logging
         if (ep + 1) % 50 == 0:
-            elapsed  = time.time() - t_start
-            per_ep   = elapsed / (ep + 1)
+            elapsed   = time.time() - t_start
+            per_ep    = elapsed / (ep + 1)
             remaining = per_ep * (n_episodes - ep - 1)
             print(
                 f"  Episode {ep+1:>5}/{n_episodes} | "
@@ -125,7 +84,6 @@ def collect_mcts_dataset(
                 f"ETA {remaining/60:.1f}min"
             )
 
-    # Stack everything
     dataset = {
         "boards":      np.stack(all_boards,      axis=0),
         "pieces":      np.stack(all_pieces,      axis=0),
