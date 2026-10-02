@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import torch
 
 from blockblast import BlockBlast3PEnv
-from mct.ppo_agent import PPOTrainer, obs_to_tensors, valid_to_mask
+from ppo.ppo_agent import PPOTrainer, obs_to_tensors, valid_to_mask
 
 
 @dataclass

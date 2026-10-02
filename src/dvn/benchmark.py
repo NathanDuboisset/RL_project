@@ -1,20 +1,15 @@
 import argparse
 from datetime import datetime
 from pathlib import Path
-import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from tqdm import tqdm
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-from src.blockblast.block_blast_env import BlockBlastEnv
-from src.dvn.agent import DVNAgent1P
-from src.dvn.models import BlockBlastValueNet1PmultikernelFlattenned
+from blockblast.block_blast_env import BlockBlastEnv
+from dvn.agent import DVNAgent1P
+from dvn.models import BlockBlastValueNet1PmultikernelFlattenned
 
 
 def parse_args() -> argparse.Namespace:

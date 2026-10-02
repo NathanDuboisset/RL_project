@@ -4,7 +4,7 @@ import torch
 from collections import defaultdict
 from typing import Callable
 
-from mct.ppo_agent import obs_to_tensors, symexp
+from ppo.ppo_agent import obs_to_tensors, symexp
 
 
 def _board_to_obs(
@@ -117,7 +117,7 @@ class MCTSAgentFirstOnly:
             {k: v.astype(np.float32) for k, v in batch.items()},
             self.device,
         )
-        from mct.ppo_agent import valid_to_mask
+        from ppo.ppo_agent import valid_to_mask
         mask_t = torch.as_tensor(
             valid_to_mask(batch["valid_placements"]), device=self.device
         )

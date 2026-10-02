@@ -4,7 +4,7 @@ import torch
 from collections import defaultdict
 from typing import Callable
 
-from mct.ppo_agent import obs_to_tensors, symexp
+from ppo.ppo_agent import obs_to_tensors, symexp
 
 
 def _board_to_obs(
@@ -117,7 +117,7 @@ class MCTSAgent:
         raw_rewards = np.array(
             [c["cumulative_reward_3steps"] for c in candidates], dtype=np.float32
         )
-        from mct.ppo_agent import symlog as _symlog
+        from ppo.ppo_agent import symlog as _symlog
         rewards_sl = _symlog(raw_rewards)
 
         if self.value_weight > 0.0:
@@ -172,7 +172,7 @@ class MCTSAgent:
             {k: v.astype(np.float32) for k, v in batch.items()},
             self.device,
         )
-        from mct.ppo_agent import valid_to_mask
+        from ppo.ppo_agent import valid_to_mask
         mask_t = torch.as_tensor(
             valid_to_mask(batch["valid_placements"]), device=self.device
         )

@@ -6,9 +6,6 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from pathlib import Path
-import sys
-
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from blockblast.block_blast_env import BlockBlastEnv
 from dqn import RainbowAgent1P

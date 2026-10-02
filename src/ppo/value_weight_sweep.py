@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from mct.mcts_agent import MCTSAgent
+from ppo.mcts_agent import MCTSAgent
 
 
 def run_sweep(

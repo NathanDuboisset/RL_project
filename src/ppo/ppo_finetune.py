@@ -6,7 +6,7 @@ from torch.distributions import Categorical
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-from mct.ppo_agent import symlog
+from ppo.ppo_agent import symlog
 
 
 def compute_gae(
