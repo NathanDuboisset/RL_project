@@ -5,8 +5,7 @@ import numpy as np
 import random
 import itertools
 from collections import deque
-from src.dqn.agent import BaseAgent
-from abc import abstractmethod, ABC
+from common.agent import BaseAgent
 from src.blockblast import BlockBlast3PEnv
 
 
@@ -33,9 +32,6 @@ class DVNAgent1P(BaseAgent):
         self.base_points = 10
         self.action_rows = np.arange(self.action_size, dtype=np.int64) // self.grid_size
         self.action_cols = np.arange(self.action_size, dtype=np.int64) % self.grid_size
-
-    def update_target_model(self):
-        self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def store_transition(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -146,20 +142,6 @@ class DVNAgent1P(BaseAgent):
         return loss.item()
 
         
-
-    def save_model(self, path):
-        torch.save({
-            'policy_state_dict': self.policy_net.state_dict(),
-            'target_state_dict': self.target_net.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-        }, path)
-
-    def load_model(self, path):
-        checkpoint = torch.load(path)
-        self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
-        self.target_net.load_state_dict(checkpoint['target_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
 
 class RoundPlanner3P:
     def __init__(self, gamma: float, agent: DVNAgent1P, eval_batch_size: int = 4096) -> None:
