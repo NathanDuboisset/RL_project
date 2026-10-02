@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 import torch
 
 from blockblast import BlockBlast3PEnv
-from ppo.ppo_agent import PPOTrainer, obs_to_tensors, valid_to_mask
+from common.evaluation import run_episodes
+from ppo.mcts_agent import PPOGreedy
+from ppo.ppo_agent import PPOTrainer
 
 
 @dataclass
@@ -78,34 +80,14 @@ def plot_history(history: dict, save_path: str = "training_curves.png", title_su
 
 
 def evaluate(trainer: PPOTrainer, n_episodes: int = 20) -> dict:
-    env = BlockBlast3PEnv()
-    returns, lengths = [], []
-
-    for _ in range(n_episodes):
-        obs, _ = env.reset()
-        total_r = 0.0
-        n_steps = 0
-        while True:
-            batch  = {k: v[None] for k, v in obs.items()}
-            obs_t  = obs_to_tensors(batch, trainer.device)
-            mask_t = torch.as_tensor(
-                valid_to_mask(batch["valid_placements"]),
-                device=trainer.device,
-            )
-            actions, *_ = trainer.model.get_action(obs_t, mask_t, deterministic=True)
-            obs, r, term, trunc, _ = env.step(int(actions[0]))
-            total_r += r
-            n_steps += 1
-            if term or trunc:
-                break
-        returns.append(total_r)
-        lengths.append(n_steps)
-
-    env.close()
+    """Deterministic PPO policy on fixed seeds, so checkpoints are compared on the same episodes."""
+    stats = run_episodes(BlockBlast3PEnv(), PPOGreedy(trainer.model, trainer.device),
+                         n_episodes, seed=0, progress=False).summary()
+    trainer.model.train()
     return {
-        "mean_return": float(np.mean(returns)),
-        "std_return":  float(np.std(returns)),
-        "mean_length": float(np.mean(lengths)),
+        "mean_return": stats["return"]["mean"],
+        "std_return":  stats["return"]["std"],
+        "mean_length": stats["length"]["mean"],
     }
 
 

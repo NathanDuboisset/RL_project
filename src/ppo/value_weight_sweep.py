@@ -1,7 +1,10 @@
+"""Sweep of the value weight alpha of MCTS Full Triplet (report, Figure 6)."""
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from ppo.mcts_agent import MCTSAgent
+
+from common.evaluation import run_episodes
+from ppo.mcts_agent import MCTSAgent, stats_as_dict
 
 
 def run_sweep(
@@ -11,7 +14,9 @@ def run_sweep(
     n_episodes: int = 50,
     weights: list   = None,
     plot_path: str  = None,
+    seed: int       = 0,
 ) -> dict:
+    """Every weight is evaluated on the same seeded episodes (paired comparison)."""
     if weights is None:
         weights = [0.0, 0.05, 0.1, 0.3, 0.5, 1.0]
 
@@ -19,7 +24,7 @@ def run_sweep(
 
     print(f"Value weight sweep — {len(weights)} values × {n_episodes} episodes\n")
     print(f"{'Weight':>8} | {'Mean Ret':>10} | {'Median Ret':>11} | "
-          f"{'Mean Len':>9} | {'Std Ret':>9} | {'ms/round':>9}")
+          f"{'Mean Len':>9} | {'Std Ret':>9} | {'ms/dec':>9}")
     print("─" * 70)
 
     for w in weights:
@@ -32,7 +37,7 @@ def run_sweep(
             value_weight = w,
         )
 
-        stats = agent.evaluate(env_fn, n_episodes=n_episodes, use_mcts=True)
+        stats = stats_as_dict(run_episodes(env_fn(), agent, n_episodes, seed=seed, desc=f"w={w}"))
         results[w] = stats
 
         print(
@@ -40,7 +45,7 @@ def run_sweep(
             f"{stats['median_return']:>11.2f} | "
             f"{stats['mean_length']:>9.1f} | "
             f"{stats['std_return']:>9.2f} | "
-            f"{stats['mean_time_per_round_ms']:>9.1f}"
+            f"{stats['mean_time_per_decision_ms']:>9.1f}"
         )
 
     best_w     = max(results, key=lambda w: results[w]["mean_return"])

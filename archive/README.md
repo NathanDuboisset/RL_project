@@ -12,6 +12,7 @@ maintained: imports may be out of date (e.g. `from ppo...` modules that moved).
 | `src/ppo/ppo_finetune.py` | PPO fine-tuning on the MCTS dataset (experiment) |
 | `src/dqn/models_3p.py` | `BlockBlastCNNNet`, DQN network for the 3-piece env (the report only covers DQN in 1P) |
 | `notebooks/ddqn_3p.ipynb` | DDQN on the 3-piece env; uses a `DDQNAgent` class that no longer exists |
+| `notebooks/benchmark_3p_exploration.ipynb` | Earlier version of `notebooks/benchmark_3p_clean.ipynb`, with an extra "DVN + MCTS" budgeted search not in the report |
 | `plots/` | Intermediate benchmark plots not included in the report |
 | `report_2026-03-16_old.pdf` | Earlier version of the report |
 
