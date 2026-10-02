@@ -359,7 +359,7 @@ class PPOTrainer:
         print(f"Saved -> {path}  (step {self.total_steps:,})")
 
     def load(self, path: str):
-        ckpt = torch.load(path, map_location=self.device)
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
 
         self.model.load_state_dict(ckpt["model"])
         self.optimizer.load_state_dict(ckpt["optimizer"])
@@ -380,3 +380,11 @@ class PPOTrainer:
             f"(step {self.total_steps:,} | "
             f"mean_ret {np.mean(self.ep_returns):.1f} over last {len(self.ep_returns)} eps)"
         )
+
+
+def load_ppo_model(path: str, device="cpu") -> ActorCritic:
+    """ActorCritic in eval mode from a PPOTrainer checkpoint (no environments needed)."""
+    model = ActorCritic().to(device)
+    ckpt = torch.load(path, map_location=device, weights_only=False)
+    model.load_state_dict(ckpt["model"])
+    return model.eval()

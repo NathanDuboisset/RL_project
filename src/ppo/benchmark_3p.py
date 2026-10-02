@@ -1,10 +1,9 @@
 """Benchmark PPO greedy vs MCTS First Only vs MCTS Full Triplet on BlockBlast 3P
 (report, Section 5.4, Figure 8). Needs a trained PPO checkpoint (not versioned).
 
-    from ppo.ppo_agent import PPOTrainer
-    trainer = PPOTrainer([BlockBlast3PEnv()]); trainer.load("checkpoints/ppo/....pt")
-    run_benchmark(trainer.model, lambda: BlockBlast3PEnv(), n_episodes=100, value_weight=0.3)
+    python -m ppo.benchmark_3p --checkpoint checkpoints/ppo/ckpt_42516k.pt --value-weight 0.3
 """
+import argparse
 import os
 from typing import Callable
 
@@ -13,7 +12,10 @@ import numpy as np
 import torch
 
 from common.evaluation import print_table, run_episodes, save_npz
+from blockblast import BlockBlast3PEnv
+from common.utils import default_device
 from ppo.mcts_agent import MCTSAgent, MCTSAgentFirstOnly, PPOGreedy
+from ppo.ppo_agent import load_ppo_model
 
 
 def _plot_benchmark(results: dict, save_path: str):
@@ -120,3 +122,24 @@ def run_benchmark(
     save_npz(npz_path, stats, seed=seed, value_weight=value_weight, gamma=gamma)
     print(f"Raw data saved -> {npz_path}")
     return results
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--checkpoint", required=True, help="PPOTrainer checkpoint (.pt).")
+    parser.add_argument("--episodes", type=int, default=100)
+    parser.add_argument("--value-weight", type=float, default=0.3, help="alpha of MCTS Full Triplet.")
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", default=default_device())
+    parser.add_argument("--output-dir", default="plots")
+    args = parser.parse_args()
+    os.makedirs(args.output_dir, exist_ok=True)
+    device = torch.device(args.device)
+    run_benchmark(load_ppo_model(args.checkpoint, device), BlockBlast3PEnv, device=device,
+                  n_episodes=args.episodes, gamma=args.gamma, value_weight=args.value_weight,
+                  save_dir=args.output_dir, seed=args.seed)
+
+
+if __name__ == "__main__":
+    main()

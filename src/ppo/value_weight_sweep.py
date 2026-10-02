@@ -1,10 +1,18 @@
-"""Sweep of the value weight alpha of MCTS Full Triplet (report, Figure 6)."""
+"""Sweep of the value weight alpha of MCTS Full Triplet (report, Figure 6).
+
+    python -m ppo.value_weight_sweep --checkpoint checkpoints/ppo/ckpt_42516k.pt --episodes 50
+"""
+import argparse
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
 from common.evaluation import run_episodes
+from blockblast import BlockBlast3PEnv
+from common.utils import default_device
 from ppo.mcts_agent import MCTSAgent, stats_as_dict
+from ppo.ppo_agent import load_ppo_model
 
 
 def run_sweep(
@@ -93,3 +101,21 @@ def run_sweep(
         print(f"\nPlot saved -> {plot_path}")
 
     return results
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--checkpoint", required=True, help="PPOTrainer checkpoint (.pt).")
+    parser.add_argument("--episodes", type=int, default=50)
+    parser.add_argument("--weights", type=float, nargs="+", default=[0.0, 0.05, 0.1, 0.3, 0.5, 1.0])
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", default=default_device())
+    parser.add_argument("--plot", default="plots/value_weight_sweep.png")
+    args = parser.parse_args()
+    device = torch.device(args.device)
+    run_sweep(load_ppo_model(args.checkpoint, device), BlockBlast3PEnv, device=device,
+              n_episodes=args.episodes, weights=args.weights, plot_path=args.plot, seed=args.seed)
+
+
+if __name__ == "__main__":
+    main()
