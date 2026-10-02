@@ -14,3 +14,16 @@ wandb/
 # training data
 checkpoints/
 videos/
+# LaTeX build outputs
+report/*.aux
+report/*.fdb_latexmk
+report/*.fls
+report/*.log
+report/*.out
+report/*.toc
+report/*.nav
+report/*.snm
+report/*.synctex.gz
+
+# macOS
+.DS_Store
