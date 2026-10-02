@@ -29,7 +29,7 @@ importable from anywhere, e.g. `from dvn.agent import load_dvn_agent`.
 | §5.4 Fig. 8 (PPO greedy vs MCTS) | `src/ppo/benchmark_3p.py` |
 | Shared: base agent, evaluation loop, baselines, plots | `src/common/` |
 
-Code not used in the report is in [`archive/`](archive/README.md).
+Experiments not used in the report were removed from the tree; they are in the git history (tag `pre-refactor`).
 
 ## Running the benchmarks
 
