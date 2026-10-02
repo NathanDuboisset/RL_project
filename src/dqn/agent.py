@@ -1,4 +1,3 @@
-from abc import abstractmethod, ABC
 from pathlib import Path
 import torch
 import torch.nn as nn
@@ -6,29 +5,9 @@ import torch.optim as optim
 import numpy as np
 import random
 from collections import deque
+from common.agent import BaseAgent
 from .models import BlockBlastCNNNet1P
 
-class BaseAgent(ABC):
-    def __init__(self, model, optimizer, device):
-        self.model = model
-        self.optimizer = optimizer
-        self.device = device
-
-    @abstractmethod
-    def select_action(self, state, epsilon) -> int:
-        pass
-
-    @abstractmethod
-    def update_model(self):
-        pass
-
-    @abstractmethod
-    def save_model(self, path):
-        pass
-
-    @abstractmethod
-    def load_model(self, path):
-        pass
 
 class DDQNAgent1P(BaseAgent):
     def __init__(self, action_size=64, lr=1e-4, gamma=0.99, buffer_size=10000, batch_size=64, device = None):
@@ -47,9 +26,6 @@ class DDQNAgent1P(BaseAgent):
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.memory = deque(maxlen=buffer_size)
         self.loss_fn = nn.MSELoss()
-
-    def update_target_model(self):
-        self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def store_transition(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -107,19 +83,6 @@ class DDQNAgent1P(BaseAgent):
         self.optimizer.step()
         
         return loss.item()
-
-    def save_model(self, path):
-        torch.save({
-            'policy_state_dict': self.policy_net.state_dict(),
-            'target_state_dict': self.target_net.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-        }, path)
-
-    def load_model(self, path):
-        checkpoint = torch.load(path)
-        self.policy_net.load_state_dict(checkpoint['policy_state_dict'])
-        self.target_net.load_state_dict(checkpoint['target_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
 class PrioritizedReplayBuffer:
     def __init__(self, capacity, alpha=0.6):
@@ -236,9 +199,6 @@ class RainbowAgent1P(BaseAgent):
         self.memory = PrioritizedReplayBuffer(capacity=buffer_size, alpha=self.alpha)
         self.n_step_buffer = deque(maxlen=self.n_step)
 
-    def update_target_model(self):
-        self.target_net.load_state_dict(self.policy_net.state_dict())
-
     def store_transition(self, state, action, reward, next_state, done):
         self.n_step_buffer.append((state, action, reward, next_state, done))
         if len(self.n_step_buffer) < self.n_step:
@@ -349,16 +309,3 @@ class RainbowAgent1P(BaseAgent):
         self.optimizer.step()
         
         return weighted_loss.item()
-
-    def save_model(self, path):
-        torch.save({
-            "policy_state_dict": self.policy_net.state_dict(),
-            "target_state_dict": self.target_net.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-        }, path)
-
-    def load_model(self, path):
-        checkpoint = torch.load(path)
-        self.policy_net.load_state_dict(checkpoint["policy_state_dict"])
-        self.target_net.load_state_dict(checkpoint["target_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
