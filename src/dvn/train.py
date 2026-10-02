@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 import random
 from typing import Any, Optional, Tuple
@@ -8,17 +7,10 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = PROJECT_ROOT / "src"
-for path in (PROJECT_ROOT, SRC_ROOT):
-    path_str = str(path)
-    if path_str not in sys.path:
-        sys.path.insert(0, path_str)
-
-from src.dvn.agent import DVNAgent1P
-from src.blockblast.block_blast_env import BlockBlastEnv
+from dvn.agent import DVNAgent1P
+from blockblast.block_blast_env import BlockBlastEnv
 from datetime import datetime
-from src.dvn.models import *
+from dvn.models import *
 
 
 def _torch_load_compat(path: str, map_location: torch.device) -> dict[str, Any]:

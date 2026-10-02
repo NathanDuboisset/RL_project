@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import os
 from typing import Callable
 
-from mct.mcts_agent import MCTSAgent
-from mct.mcts_agent_first_only import MCTSAgentFirstOnly
-from mct.ppo_agent import obs_to_tensors, valid_to_mask
+from ppo.mcts_agent import MCTSAgent
+from ppo.mcts_agent_first_only import MCTSAgentFirstOnly
+from ppo.ppo_agent import obs_to_tensors, valid_to_mask
 
 
 def _run_ppo_greedy(model, env_fn, device, n_episodes):

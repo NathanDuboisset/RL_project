@@ -4,10 +4,10 @@ import torch
 import os
 import matplotlib.pyplot as plt
 
-from mct.ppo_agent import (
+from ppo.ppo_agent import (
     PPOTrainer, stack_obs, obs_to_tensors, valid_to_mask, symlog
 )
-from mct.mcts_agent import MCTSAgent
+from ppo.mcts_agent import MCTSAgent
 
 
 class MCTSPPOTrainer(PPOTrainer):

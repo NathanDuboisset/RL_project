@@ -1,8 +1,8 @@
 import time
 import numpy as np
 import torch
-from mct.mcts_agent import MCTSAgent
-from mct.ppo_agent import valid_to_mask
+from ppo.mcts_agent import MCTSAgent
+from ppo.ppo_agent import valid_to_mask
 
 
 def collect_mcts_dataset(

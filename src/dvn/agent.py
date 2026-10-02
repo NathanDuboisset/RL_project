@@ -6,7 +6,7 @@ import random
 import itertools
 from collections import deque
 from common.agent import BaseAgent
-from src.blockblast import BlockBlast3PEnv
+from blockblast import BlockBlast3PEnv
 
 
 class DVNAgent1P(BaseAgent):
