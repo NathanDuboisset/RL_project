@@ -65,7 +65,8 @@ def _():
 
 @check("DVN 3P RoundPlanner3P (1 épisode court)")
 def _():
-    from dvn.agent import DVNAgent1P, RoundPlanner3P
+    from dvn.agent import DVNAgent1P
+    from dvn.planner import RoundPlanner3P
     from dvn.models import BlockBlastValueNet1PmultikernelFlattenned as Net
     ag = DVNAgent1P(policy_net=Net, device=dev)
     pl = RoundPlanner3P(gamma=0.99, agent=ag)
@@ -84,7 +85,7 @@ def _():
     tr._reset_all_envs(); tr._collect_rollout(); tr._ppo_update()
     return f"params={nparams(tr.model):,} (rapport: ~848k)"
 
-for cls_name, mod in [("MCTSAgent", "ppo.mcts_agent"), ("MCTSAgentFirstOnly", "ppo.mcts_agent_first_only")]:
+for cls_name, mod in [("MCTSAgent", "ppo.mcts_agent"), ("MCTSAgentFirstOnly", "ppo.mcts_agent")]:
     @check(f"PPO + {cls_name} (5 pas)")
     def _(cls_name=cls_name, mod=mod):
         import importlib
@@ -98,6 +99,19 @@ for cls_name, mod in [("MCTSAgent", "ppo.mcts_agent"), ("MCTSAgentFirstOnly", "p
             _, _, term, trunc, _ = env.step(a); steps += 1
             if term or trunc: break
         return f"{steps} pas joués"
+
+import subprocess, tempfile, os
+for script, extra in [("dvn.benchmark_1p", ["--episodes", "3", "--max-steps", "10"]),
+                      ("dvn.benchmark_3p", ["--episodes", "1", "--max-steps", "6", "--policies",
+                                            "dvn-d2", "round-planner", "greedy-d2", "random"])]:
+    @check(f"script {script}")
+    def _(script=script, extra=extra):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+            cmd = [sys.executable, "-m", script, "--device", "cpu", "--output-dir", tmp,
+                   "--checkpoint", str(ROOT / "final_weights/dvn_final_20260313_020137.pt"), *extra]
+            subprocess.run(cmd, check=True, capture_output=True, env=env)
+            return f"{len(os.listdir(tmp))} fichiers produits (png + npz)"
 
 print("\n================ RÉSUMÉ")
 for k, v in results.items(): print(f"{k:45s} {v}")

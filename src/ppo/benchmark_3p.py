@@ -1,142 +1,19 @@
-import time
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
+"""Benchmark PPO greedy vs MCTS First Only vs MCTS Full Triplet on BlockBlast 3P
+(report, Section 5.4, Figure 8). Needs a trained PPO checkpoint (not versioned).
+
+    from ppo.ppo_agent import PPOTrainer
+    trainer = PPOTrainer([BlockBlast3PEnv()]); trainer.load("checkpoints/ppo/....pt")
+    run_benchmark(trainer.model, lambda: BlockBlast3PEnv(), n_episodes=100, value_weight=0.3)
+"""
 import os
 from typing import Callable
 
-from ppo.mcts_agent import MCTSAgent
-from ppo.mcts_agent_first_only import MCTSAgentFirstOnly
-from ppo.ppo_agent import obs_to_tensors, valid_to_mask
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-
-def _run_ppo_greedy(model, env_fn, device, n_episodes):
-    model.eval()
-    returns, lengths = [], []
-
-    for ep in range(n_episodes):
-        env = env_fn()
-        obs, _ = env.reset()
-        total_r, n_steps = 0.0, 0
-
-        while True:
-            obs_t = {
-                "board":       torch.as_tensor(obs["board"][None].astype(np.float32),       device=device),
-                "pieces":      torch.as_tensor(obs["pieces"][None].astype(np.float32),      device=device),
-                "pieces_used": torch.as_tensor(obs["pieces_used"][None].astype(np.float32), device=device),
-                "combo":       torch.as_tensor(obs["combo"][None].astype(np.float32),       device=device),
-            }
-            mask_t = torch.as_tensor(
-                valid_to_mask(obs["valid_placements"][None]), device=device
-            )
-            with torch.no_grad():
-                actions, *_ = model.get_action(obs_t, mask_t, deterministic=True)
-            action = int(actions[0])
-
-            obs, r, term, trunc, _ = env.step(action)
-            total_r += r
-            n_steps += 1
-
-            if term or trunc:
-                break
-
-        returns.append(total_r)
-        lengths.append(n_steps)
-        env.close()
-
-        if (ep + 1) % 20 == 0:
-            print(f"  [PPO greedy]      ep {ep+1:>4}/{n_episodes} | "
-                  f"return {total_r:>8.1f} | len {n_steps:>4}")
-
-    return np.array(returns), np.array(lengths)
-
-
-def _run_mcts_first_only(model, env_fn, device, n_episodes, gamma, value_weight):
-    agent = MCTSAgentFirstOnly(
-        model      = model,
-        device     = device,
-        gamma      = gamma,
-        batch_size = 512,
-        verbose    = False,
-    )
-    returns, lengths, round_times = [], [], []
-
-    for ep in range(n_episodes):
-        env = env_fn()
-        obs, _ = env.reset()
-        total_r, n_steps = 0.0, 0
-
-        while True:
-            t0 = time.time()
-            action = agent.select_action(env)
-            round_times.append((time.time() - t0) * 1000)
-
-            obs, r, term, trunc, _ = env.step(action)
-            total_r += r
-            n_steps += 1
-
-            if term or trunc:
-                break
-
-        returns.append(total_r)
-        lengths.append(n_steps)
-        env.close()
-
-        if (ep + 1) % 20 == 0:
-            print(f"  [MCTS first-only] ep {ep+1:>4}/{n_episodes} | "
-                  f"return {total_r:>8.1f} | len {n_steps:>4} | "
-                  f"avg search {np.mean(round_times):.0f}ms")
-
-    return np.array(returns), np.array(lengths), np.mean(round_times)
-
-
-def _run_mcts_full_triplet(model, env_fn, device, n_episodes, gamma, value_weight):
-    agent = MCTSAgent(
-        model        = model,
-        device       = device,
-        gamma        = gamma,
-        batch_size   = 512,
-        verbose      = False,
-        value_weight = value_weight,
-    )
-    returns, lengths, round_times = [], [], []
-
-    for ep in range(n_episodes):
-        env = env_fn()
-        obs, _ = env.reset()
-        total_r, n_steps = 0.0, 0
-        action_queue = []
-
-        while True:
-            if not action_queue:
-                t0 = time.time()
-                action_queue = agent.select_round(env)
-                round_times.append((time.time() - t0) * 1000)
-                if not action_queue:
-                    action_queue = [agent._greedy_fallback(env)]
-
-            action = action_queue.pop(0)
-            obs, r, term, trunc, _ = env.step(action)
-            total_r += r
-            n_steps += 1
-
-            if term or trunc:
-                action_queue = []
-                break
-
-            if np.all(obs["pieces_used"] == 0):
-                action_queue = []
-
-        returns.append(total_r)
-        lengths.append(n_steps)
-        env.close()
-
-        if (ep + 1) % 20 == 0:
-            print(f"  [MCTS full triplet] ep {ep+1:>4}/{n_episodes} | "
-                  f"return {total_r:>8.1f} | len {n_steps:>4} | "
-                  f"avg search {np.mean(round_times):.0f}ms")
-
-    return np.array(returns), np.array(lengths), np.mean(round_times)
+from common.evaluation import print_table, run_episodes, save_npz
+from ppo.mcts_agent import MCTSAgent, MCTSAgentFirstOnly, PPOGreedy
 
 
 def _plot_benchmark(results: dict, save_path: str):
@@ -212,86 +89,34 @@ def run_benchmark(
     gamma:        float = 0.99,
     value_weight: float = 0.0,
     save_dir:     str   = ".",
+    seed:         int   = 0,
 ) -> dict:
-    model = model.to(device)
-    model.eval()
+    """value_weight only affects MCTS Full Triplet (alpha in the report)."""
+    model = model.to(device).eval()
+    policies = {
+        "PPO Greedy":        PPOGreedy(model, device),
+        "MCTS First Only":   MCTSAgentFirstOnly(model, device=device, gamma=gamma),
+        "MCTS Full Triplet": MCTSAgent(model, device=device, gamma=gamma, value_weight=value_weight),
+    }
+    stats = {name: run_episodes(env_fn(), policy, n_episodes, seed=seed, desc=name)
+             for name, policy in policies.items()}
+    print_table(stats, f"BlockBlast 3P — {n_episodes} episodes, value_weight={value_weight}")
 
     results = {}
+    for name, st in stats.items():
+        s = st.summary()
+        results[name] = {
+            "returns":       st.returns,
+            "lengths":       st.lengths,
+            "mean_return":   s["return"]["mean"],
+            "std_return":    s["return"]["std"],
+            "median_return": s["return"]["median"],
+            "mean_length":   s["length"]["mean"],
+            "ms_per_decision": s["ms_per_decision"],
+        }
 
-    print(f"\n{'='*60}")
-    print(f"1/3 — PPO Greedy ({n_episodes} episodes)")
-    print(f"{'='*60}")
-    t0 = time.time()
-    rets, lens = _run_ppo_greedy(model, env_fn, device, n_episodes)
-    results["PPO Greedy"] = {
-        "returns":       rets,
-        "lengths":       lens,
-        "mean_return":   float(np.mean(rets)),
-        "std_return":    float(np.std(rets)),
-        "median_return": float(np.median(rets)),
-        "mean_length":   float(np.mean(lens)),
-        "time_min":      (time.time() - t0) / 60,
-        "ms_per_round":  0.0,
-    }
-
-    print(f"\n{'='*60}")
-    print(f"2/3 — MCTS First Action Only ({n_episodes} episodes)")
-    print(f"{'='*60}")
-    t0 = time.time()
-    rets, lens, ms = _run_mcts_first_only(model, env_fn, device, n_episodes, gamma, value_weight)
-    results["MCTS First Only"] = {
-        "returns":       rets,
-        "lengths":       lens,
-        "mean_return":   float(np.mean(rets)),
-        "std_return":    float(np.std(rets)),
-        "median_return": float(np.median(rets)),
-        "mean_length":   float(np.mean(lens)),
-        "time_min":      (time.time() - t0) / 60,
-        "ms_per_round":  ms,
-    }
-
-    print(f"\n{'='*60}")
-    print(f"3/3 — MCTS Full Triplet ({n_episodes} episodes)")
-    print(f"{'='*60}")
-    t0 = time.time()
-    rets, lens, ms = _run_mcts_full_triplet(model, env_fn, device, n_episodes, gamma, value_weight)
-    results["MCTS Full Triplet"] = {
-        "returns":       rets,
-        "lengths":       lens,
-        "mean_return":   float(np.mean(rets)),
-        "std_return":    float(np.std(rets)),
-        "median_return": float(np.median(rets)),
-        "mean_length":   float(np.mean(lens)),
-        "time_min":      (time.time() - t0) / 60,
-        "ms_per_round":  ms,
-    }
-
-    print(f"\n{'='*60}")
-    print(f"BENCHMARK RESULTS — {n_episodes} episodes, value_weight={value_weight}")
-    print(f"{'='*60}")
-    print(f"{'Strategy':<22} | {'Mean Ret':>9} | {'±Std':>8} | {'Median':>8} | "
-          f"{'MeanLen':>8} | {'ms/round':>9} | {'vs PPO':>8}")
-    print("─" * 90)
-
-    ppo_mean = results["PPO Greedy"]["mean_return"]
-    for name, r in results.items():
-        delta = f"{(r['mean_return'] - ppo_mean) / max(abs(ppo_mean), 1) * 100:+.1f}%" \
-                if name != "PPO Greedy" else "baseline"
-        print(
-            f"{name:<22} | {r['mean_return']:>9.1f} | {r['std_return']:>8.1f} | "
-            f"{r['median_return']:>8.1f} | {r['mean_length']:>8.1f} | "
-            f"{r['ms_per_round']:>9.1f} | {delta:>8}"
-        )
-
-    plot_path = os.path.join(save_dir, "benchmark_3p.png")
-    _plot_benchmark(results, plot_path)
-
+    _plot_benchmark(results, os.path.join(save_dir, "benchmark_3p.png"))
     npz_path = os.path.join(save_dir, "benchmark_3p.npz")
-    np.savez(npz_path, **{
-        f"{k.replace(' ', '_')}_{metric}": v
-        for k, r in results.items()
-        for metric, v in [("returns", r["returns"]), ("lengths", r["lengths"])]
-    })
+    save_npz(npz_path, stats, seed=seed, value_weight=value_weight, gamma=gamma)
     print(f"Raw data saved -> {npz_path}")
-
     return results

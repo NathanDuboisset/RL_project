@@ -167,22 +167,35 @@ class BlockBlast3PEnv(gym.Env):
 
         return next_board, float(reward), int(next_combo)
 
-    def get_t_plus_3_candidates(self, gamma):
-        """Enumerate all valid 3-step sequences and return discounted cumulative rewards."""
+    def encode_action(self, piece_idx, row, col):
+        return int(piece_idx * self.grid_size * self.grid_size + row * self.grid_size + col)
+
+    def decode_action(self, action):
+        """action -> (piece_idx, row, col)"""
+        piece_idx, pos = divmod(int(action), self.grid_size * self.grid_size)
+        row, col = divmod(pos, self.grid_size)
+        return piece_idx, row, col
+
+    def iter_t_plus_3_sequences(self, gamma):
+        """Lazily enumerate all valid 3-step sequences of the current round.
+
+        Yields (actions, cumulative_reward, board_t_plus_3) where actions is
+        ((p0, r0, c0), (p1, r1, c1), (p2, r2, c2)) and
+        cumulative_reward = r_t + gamma * r_t1 + gamma**2 * r_t2.
+        Yields nothing unless the 3 pieces of the round are still available.
+        Note: the simulated combo does not apply the end-of-round combo reset.
+        """
         if self.board is None or self.pieces_grids is None or self.pieces_used is None:
-            return []
+            return
 
         available = [i for i in range(self.n_pieces) if not self.pieces_used[i]]
         if len(available) < 3:
-            return []
+            return
 
-        candidates = []
         board0 = self.board.copy()
         combo0 = int(self.combo)
 
-        for order in itertools.permutations(available, 3):
-            p0, p1, p2 = order
-
+        for p0, p1, p2 in itertools.permutations(available, 3):
             valid0 = self._valid_positions_for_piece_on_board(board0, p0)
             rows0, cols0 = np.nonzero(valid0)
             for r0, c0 in zip(rows0.tolist(), cols0.tolist()):
@@ -198,17 +211,19 @@ class BlockBlast3PEnv(gym.Env):
                     for r2, c2 in zip(rows2.tolist(), cols2.tolist()):
                         board3, r_t2, _ = self._simulate_one_hyp_step(board2, combo2, p2, r2, c2)
                         cum_reward = r_t + gamma * r_t1 + (gamma ** 2) * r_t2
+                        yield ((p0, r0, c0), (p1, r1, c1), (p2, r2, c2)), float(cum_reward), board3
 
-                        candidates.append(
-                            {
-                                "state_t_plus_3": board3.copy(),
-                                "cumulative_reward_3steps": float(cum_reward),
-                                "order": order,
-                                "actions": ((p0, r0, c0), (p1, r1, c1), (p2, r2, c2)),
-                            }
-                        )
-
-        return candidates
+    def get_t_plus_3_candidates(self, gamma):
+        """Enumerate all valid 3-step sequences and return discounted cumulative rewards."""
+        return [
+            {
+                "state_t_plus_3": board3,
+                "cumulative_reward_3steps": cum_reward,
+                "order": tuple(p for p, _, _ in actions),
+                "actions": actions,
+            }
+            for actions, cum_reward, board3 in self.iter_t_plus_3_sequences(gamma)
+        ]
 
     def _sample_new_pieces(self):
         self.pieces_grids = []
