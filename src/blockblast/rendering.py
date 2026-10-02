@@ -94,7 +94,7 @@ class EpisodeRenderer:
             for r in range(h):
                 for c in range(w):
                     if grid[r, c]:
-                        _cell(tray, ox + c, oy + r, color, alpha=0.18 if used[i] else 1.0)
+                        _cell(tray, ox + c, oy + r, EMPTY if used[i] else color)
         if caption:
             fig.text(0.5, 0.015, caption, color="#a4b0be", ha="center", va="bottom", fontsize=8)
 

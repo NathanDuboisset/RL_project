@@ -4,9 +4,10 @@ import numpy as np
 from common.evaluation import EpisodeStats, ecdf
 
 
-def plot_distributions(results: dict[str, EpisodeStats], path, title: str = "") -> None:
+def plot_distributions(results: dict[str, EpisodeStats], path=None, title: str = ""):
     """Return histogram, boxplot (with outliers) and ECDF, plus the length
-    histogram: the layout of Figures 2-5 of the report. Returns are not clipped."""
+    histogram: the layout of Figures 2-5 of the report. Returns are not clipped.
+    Saves and closes the figure if `path` is given, otherwise returns it (notebooks)."""
     names = list(results)
     colors = [f"C{i}" for i in range(len(names))]
     fig, axes = plt.subplots(1, 4, figsize=(20, 4.8))
@@ -41,5 +42,7 @@ def plot_distributions(results: dict[str, EpisodeStats], path, title: str = "") 
     n_eps = {results[n].returns.size for n in names}
     fig.suptitle(f"{title} (n={'/'.join(map(str, sorted(n_eps)))} episodes)")
     fig.tight_layout()
+    if path is None:
+        return fig
     fig.savefig(path, dpi=150)
     plt.close(fig)
