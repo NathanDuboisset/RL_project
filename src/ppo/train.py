@@ -1,3 +1,9 @@
+"""Train the PPO agent on BlockBlast 3P (report, Sections 5.1-5.2, Figure 7).
+
+    python -m ppo.train --steps 50000                       # quick run
+    python -m ppo.train --steps 43000000 --n_envs 16 --checkpoint_every 500000
+    python -m ppo.train --load checkpoints/ppo/ckpt_10008k.pt --steps 1000000   # resume
+"""
 import os
 import time
 from dataclasses import dataclass, field
@@ -8,6 +14,7 @@ import matplotlib.pyplot as plt
 import torch
 
 from blockblast import BlockBlast3PEnv
+from common.utils import default_device, set_seed
 from common.evaluation import run_episodes
 from ppo.mcts_agent import PPOGreedy
 from ppo.ppo_agent import PPOTrainer
@@ -27,14 +34,15 @@ class TrainConfig:
     vf_coef:          float = 0.5
     ent_coef:         float = 0.01
     grad_norm:        float = 0.5
-    device:           str   = "cpu"
-    save:             str   = "ppo_blockblast.pt"
+    device:           str   = default_device()
+    save:             str   = "checkpoints/ppo/ppo_blockblast.pt"
     load:             str   = None
     log_interval:     int   = 10
     eval_eps:         int   = 20
-    plot:             str   = "training_curves.png"
+    plot:             str   = "checkpoints/ppo/training_curves.png"
     checkpoint_every: int   = 0
-    checkpoint_dir:   str   = "/Data/roman.lendormy/rl_checkpoints"
+    checkpoint_dir:   str   = "checkpoints/ppo"
+    seed:             int   = 0
 
 
 def make_envs(n: int):
@@ -128,6 +136,11 @@ def run(cfg: TrainConfig = None) -> tuple:
     if cfg is None:
         cfg = TrainConfig()
 
+    set_seed(cfg.seed)
+    for path in (cfg.save, cfg.plot):
+        if path:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+
     if cfg.device == "cuda" and not torch.cuda.is_available():
         print("CUDA not available, falling back to CPU.")
         cfg.device = "cpu"
@@ -138,6 +151,8 @@ def run(cfg: TrainConfig = None) -> tuple:
     print(f"Device : {device}")
 
     envs    = make_envs(cfg.n_envs)
+    for i, env in enumerate(envs):
+        env.reset(seed=cfg.seed + i)  # seeds each environment RNG once for the whole run
     ckpt_cb = CheckpointCallback(cfg)
 
     trainer = PPOTrainer(
@@ -223,7 +238,7 @@ def run(cfg: TrainConfig = None) -> tuple:
 
 def _parse_cli() -> TrainConfig:
     import argparse
-    p = argparse.ArgumentParser(description="PPO training for BlockBlast3P")
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--steps",             type=int,   default=50_000)
     p.add_argument("--n_envs",            type=int,   default=4)
     p.add_argument("--lr",                type=float, default=3e-4)
@@ -236,14 +251,15 @@ def _parse_cli() -> TrainConfig:
     p.add_argument("--vf_coef",           type=float, default=0.5)
     p.add_argument("--ent_coef",          type=float, default=0.01)
     p.add_argument("--grad_norm",         type=float, default=0.5)
-    p.add_argument("--device",            type=str,   default="cpu")
-    p.add_argument("--save",              type=str,   default="ppo_blockblast.pt")
+    p.add_argument("--device",            type=str,   default=default_device())
+    p.add_argument("--save",              type=str,   default="checkpoints/ppo/ppo_blockblast.pt")
     p.add_argument("--load",              type=str,   default=None)
     p.add_argument("--log_interval",      type=int,   default=10)
     p.add_argument("--eval_eps",          type=int,   default=20)
-    p.add_argument("--plot",              type=str,   default="training_curves.png")
+    p.add_argument("--plot",              type=str,   default="checkpoints/ppo/training_curves.png")
     p.add_argument("--checkpoint_every",  type=int,   default=0)
-    p.add_argument("--checkpoint_dir",    type=str,   default="checkpoints")
+    p.add_argument("--checkpoint_dir",    type=str,   default="checkpoints/ppo")
+    p.add_argument("--seed",              type=int,   default=0)
     a = p.parse_args()
     return TrainConfig(**vars(a))
 

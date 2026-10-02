@@ -1,16 +1,27 @@
+"""Train the DVN on BlockBlast 1P (report, Section 4.3).
+
+    python -m dvn.train                      # defaults = configuration of the final run
+    python -m dvn.train --episodes 200 --wandb
+    python -m dvn.train --resume checkpoints/dvn/dvn_ep_500.pt
+
+Checkpoints (model + full training state, for exact resumption) and a CSV log
+go to --output-dir. --wandb additionally logs to Weights & Biases.
+"""
+import argparse
+import csv
+from datetime import datetime
 from pathlib import Path
 import random
 from typing import Any, Optional, Tuple
 
-import wandb
 import numpy as np
 import torch
 from tqdm import tqdm
 
-from dvn.agent import DVNAgent1P
 from blockblast.block_blast_env import BlockBlastEnv
-from datetime import datetime
-from dvn.models import *
+from common.utils import default_device, set_seed
+from dvn.agent import DVNAgent1P
+from dvn.models import BlockBlastValueNet1PmultikernelFlattenned
 
 
 def _torch_load_compat(path: str, map_location: torch.device) -> dict[str, Any]:
@@ -87,11 +98,10 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
                 model_update_freq: int = 1,
                 resume_model_path: Optional[str] = None,
                 resume_state_path: Optional[str] = None,
+                checkpoints_dir: str = "checkpoints/dvn",
+                use_wandb: bool = False,
                 project_name="blockblast-rl", run_name=None):
-    wandb.init(
-        project=project_name,
-        name=run_name,
-        config={
+    config = {
             "num_episodes": num_episodes,
             "eps_start": eps_start,
             "eps_end": eps_end,
@@ -105,13 +115,16 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
             "reward_for_survival": env.reward_for_survival,
             "punish_for_invalid": env.punish_for_invalid,
             "base_points": env.base_points
-        }
-    )
+    }
+    if use_wandb:
+        import wandb
+        wandb.init(project=project_name, name=run_name, config=config)
+        wandb.watch(agent.policy_net, log="all", log_freq=10)
 
-    wandb.watch(agent.policy_net, log="all", log_freq=10)
-
-    checkpoints_dir = Path("/Data/KAT/checkpoints/")
+    checkpoints_dir = Path(checkpoints_dir)
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
+    log_file = open(checkpoints_dir / "log.csv", "a", newline="")
+    log_writer = None
 
     epsilon = eps_start
     iteration = 0
@@ -160,7 +173,7 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
         
         avg_loss = np.mean(episode_losses) if len(episode_losses) > 0 else 0.0
         
-        wandb.log({
+        metrics = {
             "Episode": episode,
             "Return (Score)": episode_return,
             "Episode Length (Steps)": step + 1, # type: ignore
@@ -168,7 +181,14 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
             "Average TD Loss": avg_loss,
             "Mean Learning Rate": np.mean([param_group['lr'] for param_group in agent.optimizer.param_groups]),
             "Buffer size" : len(agent.memory)
-        })
+        }
+        if log_writer is None:
+            log_writer = csv.DictWriter(log_file, fieldnames=list(metrics))
+            if log_file.tell() == 0:
+                log_writer.writeheader()
+        log_writer.writerow(metrics)
+        if use_wandb:
+            wandb.log(metrics)
         
         if episode % checkpoint_freq == 0:
             model_path = checkpoints_dir / f"dvn_ep_{episode}.pt"
@@ -193,40 +213,72 @@ def train_agent(env: BlockBlastEnv, agent: DVNAgent1P,
         iteration=iteration,
         agent=agent,
     )
-    wandb.finish()
+    log_file.close()
+    if use_wandb:
+        wandb.finish()
+    print(f"Final model: {final_model_path}")
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--episodes", type=int, default=10_000)
+    parser.add_argument("--max-steps", type=int, default=100, help="Maximum steps per episode.")
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--buffer-size", type=int, default=100_000)
+    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--eps-start", type=float, default=1.0)
+    parser.add_argument("--eps-end", type=float, default=0.01)
+    parser.add_argument("--eps-decay", type=float, default=0.999, help="Multiplicative decay per episode.")
+    parser.add_argument("--target-update-freq", type=int, default=800, help="In environment steps.")
+    parser.add_argument("--model-update-freq", type=int, default=4, help="One gradient step every N environment steps.")
+    parser.add_argument("--checkpoint-freq", type=int, default=500, help="In episodes.")
+    parser.add_argument("--punish-for-invalid", type=float, default=-100.0)
+    parser.add_argument("--resume", default=None, help="Model checkpoint dvn_ep_<N>.pt; its _state.pt file is loaded too.")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", default=default_device())
+    parser.add_argument("--output-dir", default="checkpoints/dvn")
+    parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases.")
+    return parser.parse_args()
+
 
 def main():
+    args = parse_args()
+    set_seed(args.seed)
     run_name = f"DVN_1P_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     env = BlockBlastEnv(
-        reward_for_survival= 5.0,
-        punish_for_invalid= -100.0,
-        base_points= 10.0
+        reward_for_survival=5.0,
+        punish_for_invalid=args.punish_for_invalid,
+        base_points=10.0,
     )
+    env.reset(seed=args.seed)  # seeds the environment RNG once for the whole run
     agent = DVNAgent1P(
         policy_net=BlockBlastValueNet1PmultikernelFlattenned,
-        lr = 1e-4,
-        buffer_size=100_000,
-        batch_size=512,
-        punish_for_invalid=-100.0,
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        lr=args.lr,
+        buffer_size=args.buffer_size,
+        batch_size=args.batch_size,
+        punish_for_invalid=args.punish_for_invalid,
+        device=torch.device(args.device),
     )
 
-    resume_model_path = None
-    resume_state_path = None
+    resume_state = None
+    if args.resume is not None:
+        resume_state = str(Path(args.resume).with_name(Path(args.resume).stem + "_state.pt"))
 
     train_agent(env, agent,
-                num_episodes=10_000,
-                max_steps_per_episode=100,
-                eps_start=1.0,
-                eps_end=0.01,
-                eps_decay=0.999,
-                target_update_freq=800,
-                checkpoint_freq=500,
-                model_update_freq=4,
-                resume_model_path=resume_model_path,
-                resume_state_path=resume_state_path,
+                num_episodes=args.episodes,
+                max_steps_per_episode=args.max_steps,
+                eps_start=args.eps_start,
+                eps_end=args.eps_end,
+                eps_decay=args.eps_decay,
+                target_update_freq=args.target_update_freq,
+                checkpoint_freq=args.checkpoint_freq,
+                model_update_freq=args.model_update_freq,
+                resume_model_path=args.resume,
+                resume_state_path=resume_state,
+                checkpoints_dir=args.output_dir,
+                use_wandb=args.wandb,
                 project_name="blockblast-rl",
                 run_name=run_name)
-    
+
+
 if __name__ == "__main__":
     main()

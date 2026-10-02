@@ -1,86 +1,86 @@
+"""Train a DDQN or Rainbow agent on BlockBlast 1P (report, Section 3).
+
+    python -m dqn.train --agent ddqn --episodes 1000
+    python -m dqn.train --agent rainbow --episodes 1000
+
+Checkpoints and the per-episode returns (CSV) go to <output-dir>/<run-name>/.
+"""
 import argparse
-import time
-import gymnasium as gym
-import torch
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
 from pathlib import Path
 
-from blockblast.block_blast_env import BlockBlastEnv
-from dqn import RainbowAgent1P
+import numpy as np
+from tqdm import tqdm
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Train Rainbow Agent on 1-Piece BlockBlastEnv")
-    parser.add_argument("--num_episodes", type=int, default=1000, help="Number of episodes to train")
-    parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
-    parser.add_argument("--target_update_freq", type=int, default=10, help="Target update frequency")
-    parser.add_argument("--epsilon", type=float, default=1.0, help="Starting epsilon")
-    parser.add_argument("--epsilon_min", type=float, default=0.05, help="Minimum epsilon")
-    parser.add_argument("--epsilon_decay", type=float, default=0.9995, help="Epsilon decay rate")
-    parser.add_argument("--training_name", type=str, default="rainbow_v0", help="Name of the training run (checkpoint folder name)")
-    parser.add_argument("--save_freq", type=int, default=None, help="Save frequency (defaults to num_episodes // 3)")
+from blockblast import BlockBlastEnv
+from common.utils import default_device, set_seed
+from dqn.agent import DDQNAgent1P, RainbowAgent1P
+
+AGENTS = {"ddqn": DDQNAgent1P, "rainbow": RainbowAgent1P}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--agent", choices=AGENTS, default="ddqn")
+    parser.add_argument("--episodes", type=int, default=1000, help="Number of training episodes.")
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--target-update-freq", type=int, default=10, help="Target network update period, in episodes.")
+    parser.add_argument("--epsilon", type=float, default=1.0, help="Initial epsilon (ignored by Rainbow, which uses noisy nets).")
+    parser.add_argument("--epsilon-min", type=float, default=0.05)
+    parser.add_argument("--epsilon-decay", type=float, default=0.9995, help="Multiplicative decay per episode.")
+    parser.add_argument("--save-every", type=int, default=None, help="Checkpoint period in episodes (default: episodes // 3).")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", default=default_device())
+    parser.add_argument("--output-dir", default="checkpoints")
+    parser.add_argument("--run-name", default=None, help="Default: <agent>_seed<seed>.")
     return parser.parse_args()
 
-def main():
+
+def main() -> None:
     args = parse_args()
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    set_seed(args.seed)
+    run_name = args.run_name or f"{args.agent}_seed{args.seed}"
+    out = Path(args.output_dir) / run_name
+    out.mkdir(parents=True, exist_ok=True)
 
-    env = BlockBlastEnv(render_mode=None)
-    agent = RainbowAgent1P(action_size=64, device=device)
-    
-    num_params = len(torch.nn.utils.parameters_to_vector(agent.policy_net.parameters()))
-    print(f"Number of policy_net parameters: {num_params}")
+    env = BlockBlastEnv()
+    agent = AGENTS[args.agent](action_size=64, lr=args.lr, batch_size=args.batch_size, device=args.device)
+    n_params = sum(p.numel() for p in agent.policy_net.parameters())
+    print(f"{args.agent}: {n_params:,} parameters, device={args.device}, output={out}")
 
-    project_root = Path(__file__).resolve().parent.parent.parent
-    checkpoint_dir = project_root / "checkpoints" / args.training_name
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-    save_freq = args.save_freq if args.save_freq is not None else max(1, args.num_episodes // 3)
-
-    rewards_history = []
+    save_every = args.save_every or max(1, args.episodes // 3)
     epsilon = args.epsilon
+    returns, lengths = [], []
 
-    print(f"Starting training for {args.num_episodes} episodes...")
-    for episode in tqdm(range(args.num_episodes)):
-        state, info = env.reset()
-        episode_reward = 0
-        done = False
-        
+    env.reset(seed=args.seed)  # seeds the environment RNG once for the whole run
+    for episode in (bar := tqdm(range(args.episodes))):
+        state, _ = env.reset()
+        total, steps, done = 0.0, 0, False
         while not done:
             action = agent.select_action(state, epsilon)
-            
-            next_state, reward, terminated, truncated, info = env.step(action)
+            next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             agent.store_transition(state, action, reward, next_state, done)
-            loss = agent.update_model()
+            agent.update_model()
             state = next_state
-            episode_reward += reward
-            
+            total += reward
+            steps += 1
+
         if episode % args.target_update_freq == 0:
             agent.update_target_model()
-
         epsilon = max(args.epsilon_min, epsilon * args.epsilon_decay)
-        rewards_history.append(episode_reward)
+        returns.append(total)
+        lengths.append(steps)
+        bar.set_postfix(ret100=f"{np.mean(returns[-100:]):.1f}", len100=f"{np.mean(lengths[-100:]):.1f}")
 
-        if episode > 0 and episode % save_freq == 0:
-            agent.save_model(checkpoint_dir / f"{args.training_name}_{episode}.pth")
+        if episode > 0 and episode % save_every == 0:
+            agent.save_model(out / f"{run_name}_ep{episode}.pt")
 
-    agent.save_model(checkpoint_dir / f"{args.training_name}_final.pth")
-    print("Training finished. Final model saved.")
+    agent.save_model(out / f"{run_name}_final.pt")
+    np.savetxt(out / "returns.csv", np.column_stack([np.arange(args.episodes), returns, lengths]),
+               delimiter=",", header="episode,return,length", comments="", fmt=["%d", "%.4f", "%d"])
+    print(f"Done. Final model and returns.csv saved in {out}")
 
-    history = [range(len(rewards_history)), rewards_history]
-    result_df = pd.DataFrame(
-        np.array(history).T,
-        columns=["num_episodes", "mean_final_episode_reward"],
-    )
-    result_df["agent"] = "Rainbow v0"
-    
-    csv_path = checkpoint_dir / f"{args.training_name}_results.csv"
-    result_df.to_csv(csv_path, index=False)
-    print(f"Rewards history saved to {csv_path}")
 
 if __name__ == "__main__":
     main()
