@@ -27,3 +27,7 @@ report/*.synctex.gz
 
 # macOS
 .DS_Store
+
+# Archived experiments, not used in the report (kept locally; see git history,
+# tag pre-refactor, for the versioned copy)
+archive/
