@@ -13,7 +13,7 @@ lookahead search, and **PPO with an exhaustive round planner**.
 </p>
 
 Project of the Reinforcement Learning course (CSC_52081) at École polytechnique,
-by Nathan Duboisset, Keyvan Attarian, Roman Lendormy and Arthur Fournier.
+by Nathan Duboisset, Roman Lendormy, Arthur Fournier, Keyvan Attarian and Arthur Paing.
 Full write-up: [`report/report.pdf`](report/report.pdf).
 
 ## Highlights
@@ -34,7 +34,7 @@ Full write-up: [`report/report.pdf`](report/report.pdf).
 | 3 pieces | Greedy depth-2 | 1,885 | 44 | report, Table 2 (250 episodes) |
 | 3 pieces | DVN depth-2 | 23,413 | 209 | report, Table 2 |
 | 3 pieces | PPO policy | 280 | 27 | report, Fig. 8 |
-| 3 pieces | PPO + round search (α = 0.3) | ~451,000 | ~687 | report, Fig. 8 |
+| 3 pieces | PPO + round search (α = 0.3) | 451,371 | 687 | report, Fig. 8 |
 
 Returns are heavy-tailed (a few very long games), so medians and confidence
 intervals are reported in the notebooks.
@@ -87,7 +87,7 @@ src/
 notebooks/      presentation notebooks (executed)
 final_weights/  trained DVN weights
 plots/          figures of the report
-report/         report and slides (LaTeX)
+report/         the report (PDF)
 tests/          pytest suite: environments, agents, planners, learning sanity checks,
                 performance of the trained DVN, end-to-end scripts (run by GitHub Actions)
 ```
