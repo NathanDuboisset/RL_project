@@ -31,3 +31,7 @@ report/*.synctex.gz
 # Archived experiments, not used in the report (kept locally; see git history,
 # tag pre-refactor, for the versioned copy)
 archive/
+
+# Report: only the compiled PDF is versioned (LaTeX sources and slides stay local)
+report/*
+!report/report.pdf
