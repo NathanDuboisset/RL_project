@@ -71,17 +71,3 @@ def test_final_weights_load_on_cpu(path, net):
     assert isinstance(agent.policy_net, net)
     obs, _ = BlockBlastEnv().reset(seed=0)
     assert obs["valid_placements"].reshape(-1)[agent.select_action(obs, 0.0)]
-
-
-def test_trained_dvn_beats_greedy(dvn_agent):
-    """Coarse sanity check of the weights: on 20 seeded 1P games the trained DVN
-    survives longer than the greedy baseline (report: ~60 vs ~30 placements)."""
-    from common.evaluation import run_episodes
-    from common.policies import greedy_1p
-
-    def env():
-        return BlockBlastEnv(punish_for_invalid=-100.0)
-
-    dvn = run_episodes(env(), lambda o, e: dvn_agent.select_action(o, 0.0), 20, seed=0, max_steps=100, progress=False)
-    greedy = run_episodes(env(), greedy_1p, 20, seed=0, max_steps=100, progress=False)
-    assert dvn.lengths.mean() > 1.5 * greedy.lengths.mean()

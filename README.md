@@ -1,5 +1,7 @@
 # Reinforcement Learning for Block Blast
 
+[![tests](https://github.com/NathanDuboisset/RL_project/actions/workflows/tests.yml/badge.svg)](https://github.com/NathanDuboisset/RL_project/actions/workflows/tests.yml)
+
 Agents that learn to play **Block Blast**, the 8×8 block-placement puzzle:
 Deep Q-Networks, a **Deep Value Network on afterstates** combined with
 lookahead search, and **PPO with an exhaustive round planner**.
@@ -49,7 +51,7 @@ intervals are reported in the notebooks.
 
 ```bash
 uv sync                          # Python >= 3.11; installs the project in .venv
-uv run pytest -m "not slow"      # unit tests (~30 s on CPU)
+uv run pytest -m "not slow"      # unit, learning and performance tests (~1 min on CPU)
 uv run pytest                    # + end-to-end runs of every script (~2 min)
 
 # evaluate the trained DVN
@@ -86,7 +88,8 @@ notebooks/      presentation notebooks (executed)
 final_weights/  trained DVN weights
 plots/          figures of the report
 report/         report and slides (LaTeX)
-tests/          pytest suite (environments, agents, planners, scripts)
+tests/          pytest suite: environments, agents, planners, learning sanity checks,
+                performance of the trained DVN, end-to-end scripts (run by GitHub Actions)
 ```
 
 ### Where each part of the report lives
