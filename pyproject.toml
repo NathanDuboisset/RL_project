@@ -26,3 +26,12 @@ build-backend = "setuptools.build_meta"
 # blockblast, common, dqn, dvn, ...
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]          # tests run without installing the project
+markers = ["slow: end-to-end runs of the training/benchmark scripts (deselect with -m 'not slow')"]
+addopts = "-ra"

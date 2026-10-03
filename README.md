@@ -48,8 +48,9 @@ intervals are reported in the notebooks.
 ## Quick start
 
 ```bash
-uv sync                      # Python >= 3.11; installs the project in .venv
-python tests/smoke_test.py   # every method runs a few steps on CPU (~1 min)
+uv sync                          # Python >= 3.11; installs the project in .venv
+uv run pytest -m "not slow"      # unit tests (~30 s on CPU)
+uv run pytest                    # + end-to-end runs of every script (~2 min)
 
 # evaluate the trained DVN
 python -m dvn.benchmark_1p --checkpoint final_weights/dvn_final_20260313_020137.pt
@@ -85,7 +86,7 @@ notebooks/      presentation notebooks (executed)
 final_weights/  trained DVN weights
 plots/          figures of the report
 report/         report and slides (LaTeX)
-tests/          smoke test
+tests/          pytest suite (environments, agents, planners, scripts)
 ```
 
 ### Where each part of the report lives
