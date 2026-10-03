@@ -14,7 +14,7 @@ lookahead search, and **PPO with an exhaustive round planner**.
 
 Project of the Reinforcement Learning course (CSC_52081) at École polytechnique,
 by Nathan Duboisset, Roman Lendormy, Arthur Fournier, Keyvan Attarian and Arthur Paing.
-Full write-up: [`report/report.pdf`](report/report.pdf).
+Full report: [`report/report.pdf`](report/report.pdf).
 
 ## Highlights
 
@@ -106,7 +106,7 @@ tests/          pytest suite: environments, agents, planners, learning sanity ch
 | §5.3 "MCTS" First Only / Full Triplet, Fig. 6 | `src/ppo/mcts_agent.py`, `src/ppo/value_weight_sweep.py` |
 | §5.4 Fig. 8 | `src/ppo/benchmark_3p.py` |
 
-Exploratory experiments not used in the report were removed; they remain in the
+Exploratory experiments not used in the report were removed but they remain in the
 git history (tag `pre-refactor`).
 
 ## Weights
@@ -117,21 +117,3 @@ git history (tag `pre-refactor`).
 | `final_weights/dvn_1P_60avg.pt` | `BlockBlastValueNet1P`, plain CNN, 1,345,121 parameters | earlier DVN (~52 placements in 1P) |
 
 `dvn.agent.load_dvn_agent(path)` picks the right network from the weights.
-
-## Known differences between the report and the code
-
-- §4.2 gives the DVN as 42,461 parameters with filters (1, 8, 16, 16, 16, 64).
-  42,461 is the size of the older `BlockBlastValueNet1Pmultikernel`; the trained
-  network has filters (1, 6, 8, 8, 16, 32) and 54,529 parameters.
-- §3 gives 2,674,464 parameters for both DQN agents; this is DDQN. Rainbow's
-  network (dueling + 51 atoms) has 4,755,910.
-- §4.3 says the DVN target network is updated every 200 episodes with batch
-  size 128; `dvn/train.py` updates it every 800 environment steps (one gradient
-  step every 4 environment steps) with batch size 512. Which configuration
-  produced the final weights is not recorded.
-- §4.5 describes `RoundPlanner3P` (commits to the whole round), but Table 2 was
-  produced with the lookahead of `dvn/lookahead.py`, which replans at every
-  step. Its depth-2 and depth-3 versions score end-of-round and dead-end
-  positions differently (see the module docstring).
-- Despite the name, the "MCTS" planners of §5.3 perform an exhaustive search
-  over the round, not a Monte Carlo Tree Search.
