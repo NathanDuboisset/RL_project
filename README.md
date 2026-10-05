@@ -1,6 +1,7 @@
 # Reinforcement Learning for Block Blast
 
 [![tests](https://github.com/NathanDuboisset/RL_project/actions/workflows/tests.yml/badge.svg)](https://github.com/NathanDuboisset/RL_project/actions/workflows/tests.yml)
+[![report](https://img.shields.io/badge/report-PDF-b31b1b?logo=adobeacrobatreader&logoColor=white)](report/report.pdf)
 
 Agents that learn to play **Block Blast**, the 8×8 block-placement puzzle:
 Deep Q-Networks, a **Deep Value Network on afterstates** combined with
